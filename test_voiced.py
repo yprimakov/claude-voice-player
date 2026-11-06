@@ -196,6 +196,20 @@ class SingleDaemonTests(unittest.TestCase):
             srv.server_close()
 
 
+class DesktopLinkTests(unittest.TestCase):
+    def test_maps_cli_session_to_app_session(self):
+        root = Path(tempfile.mkdtemp())
+        d = root / "acct" / "org"
+        d.mkdir(parents=True)
+        (d / "local_aaaa1111-0000-0000-0000-000000000000.json").write_text(
+            '{"sessionId":"local_aaaa1111-0000-0000-0000-000000000000",'
+            '"cliSessionId":"12345678-0f5c-47a9-8666-0123456789ab","cwd":"C:\\\\x"}')
+        voiced._DESKTOP_IDS.clear()
+        self.assertEqual(voiced.desktop_session_id("12345678-0f5c-47a9-8666-0123456789ab", root),
+                         "local_aaaa1111-0000-0000-0000-000000000000")
+        self.assertEqual(voiced.desktop_session_id("99999999-0f5c-47a9-8666-0123456789ab", root), "")
+
+
 class SpeechTests(unittest.TestCase):
     def test_machine_output_detected(self):
         self.assertTrue(voiced.looks_machine('{"messages":[{"sender":"Boris","to":"Matt"}]}'))
