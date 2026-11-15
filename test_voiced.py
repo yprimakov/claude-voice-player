@@ -574,9 +574,9 @@ class ThreadNameTests(unittest.TestCase):
             voiced.transcript_path = old
 
     def test_spoken_prefix_names_the_thread(self):
-        item = {"project": "example.ai", "thread": "Design System", "text": "Done."}
-        self.assertEqual(voiced.spoken_text(item), "From Design System, in example. Done.")
-        self.assertEqual(voiced.spoken_text({**item, "thread": "example"}), "From example. Done.")
+        item = {"project": "acme.app", "thread": "Design System", "text": "Done."}
+        self.assertEqual(voiced.spoken_text(item), "From Design System, in acme. Done.")
+        self.assertEqual(voiced.spoken_text({**item, "thread": "Acme App"}), "From acme app. Done.")
         self.assertEqual(voiced.spoken_text(item, say_source=False), "Done.")
 
 
@@ -584,16 +584,16 @@ class PinTests(unittest.TestCase):
     def test_pins_persist(self):
         path = Path(tempfile.mkdtemp()) / "settings.json"
         st = voiced.Settings(path)
-        st.update(pinned_projects=["example.ai", "example.ai", "go-getter-bot"], pinned_threads=["s1"],
+        st.update(pinned_projects=["acme.app", "acme.app", "go-getter-bot"], pinned_threads=["s1"],
                   active_hours=4)
         again = voiced.Settings(path)
-        self.assertEqual(again.get("pinned_projects"), ["example.ai", "go-getter-bot"])
+        self.assertEqual(again.get("pinned_projects"), ["acme.app", "go-getter-bot"])
         self.assertEqual(again.get("pinned_threads"), ["s1"])
         self.assertEqual(again.get("active_hours"), 4)
         again.get("pinned_projects").append("x")                       # a copy: the store is not changed
-        self.assertEqual(again.get("pinned_projects"), ["example.ai", "go-getter-bot"])
+        self.assertEqual(again.get("pinned_projects"), ["acme.app", "go-getter-bot"])
         st.update(pinned_projects="not a list")
-        self.assertEqual(voiced.Settings(path).get("pinned_projects"), ["example.ai", "go-getter-bot"])
+        self.assertEqual(voiced.Settings(path).get("pinned_projects"), ["acme.app", "go-getter-bot"])
 
     def test_pinned_replies_play_first(self):
         h = voiced.History(Path(tempfile.mkdtemp()) / "h.jsonl")

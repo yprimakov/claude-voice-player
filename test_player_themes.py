@@ -187,17 +187,17 @@ class ThemeTests(unittest.TestCase):
     def test_thread_name_shown_and_cut_before_the_project(self):
         w = self.w
         old = player.thread_title
-        player.thread_title = lambda sid, cwd="": "Design System for the client portal"
+        player.thread_title = lambda sid, cwd="": "Design System for the sample portal"
         try:
-            item = {"project": "example.ai", "session_id": "s"}
+            item = {"project": "acme.app", "session_id": "s"}
             opts = w._where(item)
-            self.assertEqual(opts[0], "example.ai · Design System for the client portal")
-            self.assertEqual(opts[-1], "example.ai")
-            self.assertTrue(all(o.startswith("example.ai") for o in opts))
-            self.assertIn("example.ai · Design System…", opts)               # cut at a word, ellipsis
+            self.assertEqual(opts[0], "acme.app · Design System for the sample portal")
+            self.assertEqual(opts[-1], "acme.app")
+            self.assertTrue(all(o.startswith("acme.app") for o in opts))
+            self.assertIn("acme.app · Design System…", opts)               # cut at a word, ellipsis
             f = w.F["mono"]
-            self.assertEqual(w._fit(opts, f, f.measure("example.ai · Design System…")), "example.ai · Design System…")
-            self.assertEqual(w._fit(opts, f, f.measure("example.ai") + 2), "example.ai")
+            self.assertEqual(w._fit(opts, f, f.measure("acme.app · Design System…")), "acme.app · Design System…")
+            self.assertEqual(w._fit(opts, f, f.measure("acme.app") + 2), "acme.app")
             w._set_mode("panel")
             w._layout_key = None
             w._tick_once(force=True)
