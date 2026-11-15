@@ -323,6 +323,41 @@ class ThemeTests(unittest.TestCase):
             w.vq.history.update("hold-new", dismissed=True)
             w._release()
 
+    def test_two_lanes_reply_never_moves_the_call(self):
+        """Two lanes: the playback lane has a fixed height, so the call sits at the same y with or without a
+        reply playing, and while he answers the reply still shows (it has its own lane)."""
+        w = self.w
+        fake = {"id": "lane-x", "ts": time.time(), "project": "other", "session_id": "s-other", "ready": True,
+                "text": "A long reply summary. " * 20}
+        try:
+            self.st.update(layout="lanes")
+            w._set_mode("panel")
+            ys = []
+            for show in (None, fake, {**fake, "text": "Short."}):
+                w._panel(show, show, [], {"paused": False}, None, True)
+                ys.append(w.c.coords(w.call_eyebrow)[1])
+            self.assertEqual(len(set(ys)), 1)
+            self.assertEqual(w.c.itemcget(w.lane_rule, "state"), "normal")
+            self.assertTrue(w.c.itemcget(w.call_eyebrow, "text").startswith("YOUR CALLS · "))
+            w._touch()                                                        # held: the reply still shows
+            w._panel(fake, fake, [], {"paused": False}, None, True)
+            self.assertTrue(w.c.itemcget(w.body, "text").startswith("A long reply"))
+            self.assertEqual(w.c.itemcget(w.call_hold, "state"), "normal")
+            self.assertEqual(w.c.coords(w.call_eyebrow)[1], ys[0])
+        finally:
+            w._release()
+            self.st.update(layout="classic")
+            w._panel(None, None, [], {"paused": False}, None, True)
+        self.assertEqual(w.c.itemcget(w.lane_rule, "state"), "hidden")
+        self.assertEqual(w.c.itemcget(w.call_thread, "state"), "hidden")
+
+    def test_clamp_lines(self):
+        f = self.w.F["body"]
+        t = "word " * 200
+        out = self.w._clamp_lines(t, f, 200, 3)
+        self.assertTrue(out.endswith("…"))
+        self.assertEqual(self.w._clamp_lines("two words", f, 200, 3), "two words")
+
     def test_thread_decisions_group_and_append(self):
         """Several replies from one thread, each with a Decisions block: one call, oldest first, a re-ask in
         place, status lines dropped, a new reply appended; answering closes every row in the group."""

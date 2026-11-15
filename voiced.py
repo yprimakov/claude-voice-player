@@ -81,6 +81,7 @@ SETTINGS_SCHEMA = {
     "pinned_projects": (list, []),
     "pinned_threads": (list, []),
     "active_hours": ([0, 1, 2, 4, 24], 2),  # 0 = no automatic boost
+    "layout": (["classic", "lanes"], "classic"),  # panel layout: one column, or Two lanes (playback / calls)
 }
 
 

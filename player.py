@@ -810,7 +810,7 @@ class MemSettings:
                    "hide_when_idle": False, "calls_hours": 24, "desktop_answers": "send",
                    "pulse_with_voice": True, "rim_color": "#F59E0B", "glow_size": 12,
                    "player_width": 1.0, "theme": "ember", "minimized": False, "reduce_motion": False,
-                   "pinned_projects": [], "pinned_threads": [], "active_hours": 2}
+                   "pinned_projects": [], "pinned_threads": [], "active_hours": 2, "layout": "classic"}
 
     def get(self, k):
         return self._v[k]
@@ -1363,13 +1363,21 @@ class Widget:
 
         # calls waiting on you
         self.call_rule = c.create_line(0, 0, 0, 0, fill=ACC[0], tags=("pan", "ask"))
+        self.lane_rule = c.create_line(0, 0, 0, 0, fill=HAIR, tags=("pan",), state="hidden")  # Two lanes divider
+        self.call_thread = c.create_text(0, 0, anchor="w", text="", font=self.F["meta"], fill=MUTED,
+                                         tags=("pan", "ask", "callfrom"))
+        self.call_hold = c.create_text(0, 0, anchor="e", text="● HELD", font=self.F["mono_s"], fill=EMBER,
+                                       tags=("pan", "ask", "callhold"))
+        self._tipify("callhold", lambda: "Held while you answer: new replies play but don't move this call")
         self.call_eyebrow = c.create_text(0, 0, anchor="w", text="YOUR CALL", font=self.F["mono"], fill=EMBER,
                                           tags=("pan", "ask"))
         self.call_from = c.create_text(0, 0, anchor="w", text="", font=self.F["mono"], fill=MUTED,
                                        tags=("pan", "ask", "callfrom"))
         c.tag_bind("callfrom", "<Button-1>", lambda e: self._open(self._call()))
-        c.tag_bind("callfrom", "<Enter>", lambda e: (c.configure(cursor="hand2"), self._tint(self.call_from, FG)))
-        c.tag_bind("callfrom", "<Leave>", lambda e: (c.configure(cursor=""), self._tint(self.call_from, MUTED)))
+        c.tag_bind("callfrom", "<Enter>", lambda e: (c.configure(cursor="hand2"), self._tint(
+            self.call_from, EMBER if self._lanes() else FG)))
+        c.tag_bind("callfrom", "<Leave>", lambda e: (c.configure(cursor=""), self._tint(
+            self.call_from, FG if self._lanes() else MUTED)))
         self._tipify("callfrom", lambda: f"{' · '.join(x for x in ((self._call() or {}).get('project'), self._thread(self._call())) if x)}\nClick to open this session")
         self.call_pin = c.create_text(0, 0, anchor="w", text="☆", font=self.F["mono"], fill=FAINT,
                                       tags=("pan", "ask", "callpin"))
@@ -2239,6 +2247,30 @@ class Widget:
 
     HOLD_S = 60
 
+    def _lanes(self) -> bool:
+        """Two lanes layout: playback on top at a fixed height, your calls below; a reply never moves a call."""
+        return self.cfg.get("layout") == "lanes"
+
+    @staticmethod
+    def _clamp_lines(text: str, font, width: int, lines: int) -> str:
+        """Greedy word wrap like Tk's; past `lines` lines, the last one ends with an ellipsis."""
+        out, cur = [], ""
+        for w in " ".join((text or "").split()).split(" "):
+            t = f"{cur} {w}" if cur else w
+            if font.measure(t) <= width or not cur:
+                cur = t
+            else:
+                out.append(cur)
+                cur = w
+        if cur:
+            out.append(cur)
+        if len(out) <= lines:
+            return " ".join(out)
+        last = out[lines - 1]
+        while last and font.measure(last + "…") > width:
+            last = last.rsplit(" ", 1)[0] if " " in last else last[:-1]
+        return " ".join(out[:lines - 1] + [last.rstrip(" ,.;:") + "…"])
+
     def _touch(self):
         self._touch_at = time.time()
 
@@ -2257,7 +2289,7 @@ class Widget:
         if self._held_new in ids:
             return self._calls[ids.index(self._held_new)].get("project") or "?"
         cur, call = self._cur, self._call()
-        if cur and call and cur.get("session_id") != call.get("session_id"):
+        if cur and call and cur.get("session_id") != call.get("session_id") and not self._lanes():
             return cur.get("project") or "?"
         return ""
 
@@ -3011,8 +3043,9 @@ class Widget:
             return self._settings_panel(force)
         call = self._call()
         held = self._engaged()
-        if held:
-            show = None  # audio still plays; the call he is answering stays put
+        lanes = self._lanes()
+        if held and not lanes:
+            show = None  # audio still plays; the call he is answering stays put (Two lanes: its own lane)
         playing = bool(show)
         body_text = ""
         if show:
@@ -3022,7 +3055,7 @@ class Widget:
         lib_rows, lib_sig, bg_count = self._library_rows(q) if self.lib else ([], None, 0)
         key = (playing, body_text, show.get("id") if show else None,
                self._call_id(call) if call else None, self._call_ix, len(self._calls),
-               self._draft_sig(call), self.lib, lib_sig, self.mode, held, self._held_label())
+               self._draft_sig(call), self.lib, lib_sig, self.mode, held, self._held_label(), lanes)
         # header (cheap, every tick)
         if show:
             name = self._where(show)
@@ -3036,7 +3069,7 @@ class Widget:
         else:
             last = self.vq.history.recent(1)
             n = len(self._calls)
-            name = self._calls_names(n) if n else "All caught up"
+            name = ("Ready" if lanes else self._calls_names(n)) if n else "All caught up"
             meta = self._last_lines(last)
         nmax = self._head_w() - p(18)  # room for the ↗
         shown_name = self._fit(name, self.F["title"], nmax)
@@ -3057,12 +3090,20 @@ class Widget:
         y = p(PAD + ORB + 16)
         state = lambda on: "normal" if on else "hidden"
         c.itemconfigure("pan", state="normal")
-        if playing:
-            self._text(self.body, body_text)
+        lane = lanes and bool(call)
+        if playing or lane:
+            txt = body_text if playing else "Nothing playing. New replies play here without moving your calls."
+            if lane:  # a fixed-height lane: three lines, so the calls lane below never moves
+                txt = self._clamp_lines(txt, self.F["body"], Wp - 2 * p(PAD), 3)
+            self._text(self.body, txt)
+            self._fill(self.body, BODY if playing else FAINT)
             c.coords(self.body, p(PAD), y)
-            bb = c.bbox(self.body)
-            y = (bb[3] if bb else y) + p(16)
-            self._bar_y = y
+            if lane:
+                y += 3 * self.F["body"].metrics("linespace") + p(16)
+            else:
+                bb = c.bbox(self.body)
+                y = (bb[3] if bb else y) + p(16)
+            self._bar_y = y if playing else 0
             c.coords(self.bar_hit, p(PAD) - p(4), y - p(10), Wp - p(PAD) + p(4), y + p(10))
             y += p(22)
             cy = y + p(17)
@@ -3071,13 +3112,19 @@ class Widget:
             c.coords(self.times, p(PAD) + p(34) + p(12), cy)
             c.coords(self.next_t, Wp - p(PAD), cy)
             y += p(34) + p(4)
-            pos, dur = self._prog[0], self._prog[1]
-            self._draw_progress(pos / dur if dur else 0, dur)
-            if not cur:
-                self._text(self.times, "up next")
+            if playing:
+                pos, dur = self._prog[0], self._prog[1]
+                self._draw_progress(pos / dur if dur else 0, dur)
+                if not cur:
+                    self._text(self.times, "up next")
         else:
             self._bar_y = 0
         c.itemconfigure("play", state=state(playing))
+        if lane:
+            c.itemconfigure(self.body, state="normal")
+            c.coords(self.lane_rule, p(PAD), y + p(2), Wp - p(PAD), y + p(2))
+            y += p(8)
+        c.itemconfigure(self.lane_rule, state=state(lane))
         if not call:
             self._call_band = None
 
@@ -3093,7 +3140,7 @@ class Widget:
             c.coords(self.call_rule, p(PAD), y, p(PAD) + p(20), y)
             c.coords(self.call_eyebrow, p(PAD) + p(28), y)
             eyebrow = ("SENT · WAITING" if call.get("sent_answer") else "APP CALL") if call.get("kind") == "project" \
-                else "YOUR CALL"  # from a cloud Project thread
+                else (f"YOUR CALLS · {len(self._calls)}" if lanes else "YOUR CALL")  # from a cloud Project thread
             self._text(self.call_eyebrow, eyebrow)
             # fixed slots from the right edge: Dismiss, next, counter, prev. Nothing here depends on the text.
             right = Wp - p(PAD)
@@ -3122,16 +3169,33 @@ class Widget:
             pin = self._pinned_state(call)
             active = not pin and self._priority(call) == 2
             room = Wp - 2 * p(PAD) - p(22) - (p(14) if active else 0)
-            full = " · ".join(x for x in (call.get("project") or "?", self._thread(call)) if x)
-            frm = self._ellipsize_mid(full, self.F["mono"], room)
+            thread = self._thread(call)
+            if lanes:  # project on its own line in the title face, the thread under it
+                f = self.F["name"]
+                room -= self.F["mono_s"].measure("● HELD") + p(12) if held else 0
+                frm = self._ellipsize(call.get("project") or "?", f, room)
+                self._fill(self.call_from, FG)
+            else:
+                f = self.F["mono"]
+                full = " · ".join(x for x in (call.get("project") or "?", thread) if x)
+                frm = self._ellipsize_mid(full, f, room)
+                self._fill(self.call_from, MUTED)
+            c.itemconfigure(self.call_from, font=f)
             self._text(self.call_from, frm)
             c.coords(self.call_from, p(PAD), y)
-            px = p(PAD) + self.F["mono"].measure(frm) + p(8)
+            c.coords(self.call_hold, Wp - p(PAD), y)
+            self._lane_hold = lanes and held
+            px = p(PAD) + f.measure(frm) + p(8)
             self._text(self.call_pin, "★" if pin else "☆")
             self._fill(self.call_pin, EMBER if pin else FAINT)
             c.coords(self.call_pin, px, y)
             c.coords(self.call_act, px + self.F["mono"].measure("★") + p(6), y)
             self._call_active = active
+            self._lane_thread = bool(lanes and thread)
+            if self._lane_thread:
+                y += p(19)
+                self._text(self.call_thread, self._ellipsize_mid(thread, self.F["meta"], Wp - 2 * p(PAD)))
+                c.coords(self.call_thread, p(PAD), y)
             self._call_band = (band_top, y + p(10))
             y += p(16)
             decs, d = self._draft(call)
@@ -3163,6 +3227,8 @@ class Widget:
         if call:
             c.itemconfigure(self.call_act, state="normal" if getattr(self, "_call_active", False) else "hidden")
             c.itemconfigure(self.call_new, state="normal" if self._held_label() else "hidden")
+            c.itemconfigure(self.call_thread, state="normal" if getattr(self, "_lane_thread", False) else "hidden")
+            c.itemconfigure(self.call_hold, state="normal" if getattr(self, "_lane_hold", False) else "hidden")
             decs, d = self._draft(call)
             in_review = len(decs) > 1 and d["ix"] >= len(decs)
             for i in (self.entry_bg, self.entry_win, self.send_bg, self.send_g):
@@ -3459,6 +3525,9 @@ class Widget:
         # appearance
         y = eyebrow("APPEARANCE", y)
         y = themes(y)
+        y = choice("layout", "Panel layout", [("classic", "Classic"), ("lanes", "Two lanes")],
+                   {"classic": "Playback and your calls share one column",
+                    "lanes": "Playback on top, your calls below: a new reply never moves a call"}, y)
         y = slider("text_size", "Text size", [0.85, 1.0, 1.15, 1.3, 1.5],
                    [SIZE_NAMES[v] for v in (0.85, 1.0, 1.15, 1.3, 1.5)], y)
         y = slider("player_width", "Player width", list(WIDTH_NAMES), list(WIDTH_NAMES.values()), y)
