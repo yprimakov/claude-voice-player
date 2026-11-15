@@ -454,6 +454,23 @@ class ThemeTests(unittest.TestCase):
             self.st.update(theme="ember")
             w._rebuild()
 
+    def test_settings_sign_off_links_to_madefire(self):
+        w, opened = self.w, []
+        w._open_url = opened.append
+        for name in ("madefire", "daylight"):
+            self.st.update(theme=name)
+            w._rebuild()
+            w._set_mode("panel")
+            w._toggle_settings()
+            self.pump()
+            self.assertTrue(w.c.find_withtag("madeby"))
+            self.assertTrue(any(w.c.type(i) == "image" for i in w.c.find_withtag("madeby")))  # the wordmark
+            w._toggle_settings()
+        w._open_url(w.MADEFIRE_URL)
+        self.assertEqual(opened[-1], "https://madefire.ai")
+        self.st.update(theme="ember")
+        w._rebuild()
+
     def test_theme_colours_are_readable(self):
         for name, t in player.THEMES.items():
             with self.subTest(theme=name):

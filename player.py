@@ -59,6 +59,11 @@ THEMES = {
                      BODY="#36302a", MUTED="#5c564f", FAINT="#6b645c", EMBER="#a1520a", INK=(60, 40, 10),
                      GLOW_WARM=(245, 158, 11), GLOW_COOL=(20, 184, 166), ORB_GLASS=(255, 250, 238),
                      ACC=("#F59E0B", "#F97316"), ACC_HI=("#FBBF24", "#F59E0B"), ACC_INK="#1c1917", ACC_RGB=(217, 119, 6), SW_KNOB="#fffdf7"),
+    # MadeFire design system v5 "Night and Flame": Night, Dusk, Smoke, Ember Ash; Bone text, Ash muted; flame gradient
+    "madefire": dict(CARD="#110D18", CARD_HI="#1B1522", HOVER="#2A2130", HAIR="#2E2633", FG="#F4EDE6",
+                     BODY="#E4DCD5", MUTED="#B3A8A1", FAINT="#938890", EMBER="#FFB25B", INK=(244, 237, 230),
+                     GLOW_WARM=(255, 107, 44), GLOW_COOL=(194, 55, 15), ORB_GLASS=(17, 13, 24),
+                     ACC=("#FFB25B", "#FF6B2C"), ACC_HI=("#FFC678", "#FF8A47"), ACC_INK="#1A0904", ACC_RGB=(255, 107, 44), SW_KNOB="#110D18"),
 }
 THEME_FONTS = {  # bundled OFL fonts first (fonts/), Windows fonts as fallback if a file is missing
     "ember": (("VQ Outfit Bold",), ("VQ Outfit Semibold",), ("VQ DM Sans",), ("VQ DM Sans Medium",),
@@ -75,11 +80,13 @@ THEME_FONTS = {  # bundled OFL fonts first (fonts/), Windows fonts as fallback i
     "daylight": (("VQ Fraunces Semibold", "Sitka Heading Semibold", "Georgia"),
                  ("VQ Fraunces Medium", "Sitka Subheading Semibold", "Georgia"),
                  ("VQ DM Sans",), ("VQ DM Sans Medium",), ("VQ JetBrains Mono",)),
+    "madefire": (("VQ Outfit Bold",), ("VQ Outfit Semibold",), ("VQ DM Sans",), ("VQ DM Sans Medium",),
+                 ("VQ JetBrains Mono",)),  # v5 type: Outfit headings, DM Sans body, JetBrains Mono
 }
 # (headings, body): Inter, Space Grotesk and Fraunces run wider than Outfit/DM Sans at the same size, so a step
 # smaller keeps the layout's metrics (no new truncation at Narrow + L)
 THEME_FONT_SCALE = {"graphite": (0.95, 0.95), "midnight": (0.95, 0.95), "daylight": (0.94, 1.0)}
-THEME_NAMES = {"ember": "Ember", "graphite": "Graphite", "midnight": "Midnight", "daylight": "Daylight"}
+THEME_NAMES = {"ember": "Ember", "graphite": "Graphite", "midnight": "Midnight", "daylight": "Daylight", "madefire": "MadeFire"}
 
 
 def apply_theme(name: str) -> None:
@@ -827,7 +834,8 @@ class MemSettings:
 
 
 RIM_NAMES = {"#F59E0B": "Promethean Amber", "#EA580C": "Cooled Ember", "#FBBF24": "Ember Light",
-             "#F43F5E": "Rose", "#8B5CF6": "Violet", "#3B82F6": "Blue", "#14B8A6": "Teal", "#E5E7EB": "White"}
+             "#F43F5E": "Rose", "#8B5CF6": "Violet", "#3B82F6": "Blue", "#14B8A6": "Teal", "#E5E7EB": "White",
+             "#FF6B2C": "Flame"}
 WIDTH_NAMES = {0.85: "Narrow", 1.0: "Default", 1.2: "Wide", 1.4: "Wider"}
 SIZE_NAMES = {0.85: "Small", 1.0: "Default", 1.15: "Large", 1.3: "Larger", 1.5: "Largest"}
 VOICE_NAMES = {"af_heart": "Heart", "af_bella": "Bella", "af_nicole": "Nicole", "af_sarah": "Sarah",
@@ -3298,6 +3306,8 @@ class Widget:
     def _set(self, key, value):
         """Change one setting and apply it right away."""
         self.cfg.update(**{key: value})
+        if key == "theme" and value == "madefire":
+            self.cfg.update(rim_color="#FF6B2C")  # the MadeFire theme pulses in Flame
         if key in ("text_size", "player_width", "theme"):
             self.root.after(10, self._rebuild)
             return
@@ -3527,7 +3537,7 @@ class Widget:
         y = themes(y)
         y = choice("layout", "Panel layout", [("classic", "Classic"), ("lanes", "Two lanes")],
                    {"classic": "Playback and your calls share one column",
-                    "lanes": "Playback on top, your calls below: a new reply never moves a call"}, y)
+                    "lanes": "Playback on top, calls below: replies never move a call"}, y)
         y = slider("text_size", "Text size", [0.85, 1.0, 1.15, 1.3, 1.5],
                    [SIZE_NAMES[v] for v in (0.85, 1.0, 1.15, 1.3, 1.5)], y)
         y = slider("player_width", "Player width", list(WIDTH_NAMES), list(WIDTH_NAMES.values()), y)
@@ -3567,7 +3577,7 @@ class Widget:
         y = toggle("summaries", "Summarize replies", "Off: read a cleaned-up excerpt instead", y)
         y = toggle("speak_background", "Speak background runs", "Batch and headless runs (always in history)", y)
         y = toggle("speak_remote_sessions", "Speak project sessions",
-                   "Sessions a Claude project starts here; the project relays their calls", y)
+                   "Sessions a project starts; its thread relays their calls", y)
         y += p(14)
 
         # behavior
@@ -3595,7 +3605,8 @@ class Widget:
             c.tag_bind(tag, "<Button-1>", lambda e, fn=fn: fn())
             c.tag_bind(tag, "<Enter>", lambda e, t=t: (self._tint(t, FG), c.configure(cursor="hand2")))
             c.tag_bind(tag, "<Leave>", lambda e, t=t: (self._tint(t, EMBER), c.configure(cursor="")))
-        y = fy + p(16) + p(R_PANEL)
+        y = self._made_by(fy + p(22))
+        y += p(R_PANEL)
         c.tag_raise("set")
         c.tag_lower("sethit", self.glow_cap)  # hit areas stay under the ambient light
         y = self._set_scroll_setup(y)
@@ -3608,6 +3619,43 @@ class Widget:
         self._place_buttons()
         self._fill(self.btn["gear"]["g"], self._btn_color("gear"))
         self._resize(y)
+
+    MADEFIRE_URL = "https://madefire.ai"
+
+    def _made_by(self, y: int) -> int:
+        """Settings sign-off: the MadeFire V2 wordmark (light or dark by the card), one line, a link to the site."""
+        c, p = self.c, self.p
+        x0, x1 = p(PAD), self.Wp - p(PAD)
+        mid = (x0 + x1) / 2
+        c.create_line(x0, y, x1, y, fill=HAIR, tags=("set",))
+        y += p(22)
+        light = sum(int(CARD[i:i + 2], 16) for i in (1, 3, 5)) > 384
+        try:  # wordmark at the brand minimum width (120 px), crisp on scaled displays
+            from PIL import Image, ImageTk
+            im = Image.open(_HERE / "assets" / f"madefire-wordmark-{'light' if light else 'dark'}.png")
+            w = max(p(120), 120)
+            self._mf_logo = ImageTk.PhotoImage(im.resize((w, round(im.height * w / im.width)), Image.LANCZOS))
+            c.create_image(mid, y, anchor="n", image=self._mf_logo, tags=("set", "madeby"))
+            y += self._mf_logo.height() + p(12)
+        except Exception as e:  # cosmetic: the text below still says it
+            self.api.log(f"wordmark: {e!r}")
+        c.create_text(mid, y, anchor="n", text="Ember Voice Player is made by MadeFire AI", font=self.F["meta"],
+                      fill=MUTED, tags=("set",))
+        y += self.F["meta"].metrics("linespace") + p(6)
+        t = c.create_text(mid, y, anchor="n", text="madefire.ai ↗", font=self.F["link"], fill=EMBER,
+                          tags=("set", "madeby"))
+        c.tag_bind("madeby", "<Button-1>", lambda e: self._open_url(self.MADEFIRE_URL))
+        self._link_u = self.F["link"].copy()
+        self._link_u.configure(underline=1)
+        c.tag_bind("madeby", "<Enter>", lambda e: (c.itemconfigure(t, font=self._link_u), c.configure(cursor="hand2")))
+        c.tag_bind("madeby", "<Leave>", lambda e: (c.itemconfigure(t, font=self.F["link"]), c.configure(cursor="")))
+        self._tipify("madeby", lambda: "Open madefire.ai in your browser")
+        return y + self.F["link"].metrics("linespace") + p(16)
+
+    @staticmethod
+    def _open_url(url: str) -> None:
+        import webbrowser
+        webbrowser.open(url)
 
     def _set_scroll_setup(self, total: int) -> int:
         """When Settings is taller than the screen allows, the body scrolls under a fixed header and a fixed,
