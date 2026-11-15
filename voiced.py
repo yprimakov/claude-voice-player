@@ -364,9 +364,13 @@ def _iso_ts(s: str) -> float:
         return 0.0
 
 
+_RELAYED = re.compile(r"<wake reason=\"(?:mention|message-edited)\"|<relay from=")  # a project's message
+
+
 def user_turn_after(path: Path, since: float, tail: int = 262144) -> float:
     """Time of a message the user typed in the session after `since` (0 if none): a real user turn, not a tool
-    result, slash-command output, compaction summary or other meta entry."""
+    result, slash-command output, compaction summary or other meta entry. A message relayed from a Claude app
+    project (<wake>, <relay>) counts: the session has moved on."""
     try:
         with path.open("rb") as f:
             f.seek(0, 2)
@@ -388,7 +392,7 @@ def user_turn_after(path: Path, since: float, tail: int = 262144) -> float:
         content = (d.get("message") or {}).get("content")
         texts = [content] if isinstance(content, str) else [
             c.get("text", "") for c in (content or []) if isinstance(c, dict) and c.get("type") == "text"]
-        if any(t.strip() and not t.lstrip().startswith("<") for t in texts):
+        if any(t.strip() and (not t.lstrip().startswith("<") or _RELAYED.search(t)) for t in texts):
             return ts
     return 0.0
 

@@ -208,6 +208,15 @@ class ThemeTests(unittest.TestCase):
         finally:
             player.thread_title = old
 
+    def test_project_started_session_is_never_a_call(self):
+        """A reply from a "Local session (from a project)" is logged, not spoken, and never a call: its
+        project thread relays what needs the user, and the link would open a session he does not drive."""
+        r = {"id": "rs1", "ts": time.time() - 30, "cwd": "C:/x/agentic-os-v2", "project": "agentic-os-v2",
+             "session_id": "rc-1", "entrypoint": "claude-desktop", "status": "not spoken: remote session",
+             "text": "x", "decision": {"question": "Look for notes?", "options": ["A", "B"], "recommended": 0}}
+        self.w.vq.history.add(r)
+        self.assertFalse(any(c["id"] == "rs1" for c in self.w._collect_calls_raw(None)))
+
     def test_pins_order_calls_and_star(self):
         w = self.w
         now = time.time()

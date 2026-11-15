@@ -2165,8 +2165,8 @@ class Widget:
         groups: dict[str, list[dict]] = {}
         for r in reversed(rows):  # oldest first
             if (r.get("answer") or r.get("dismissed") or r.get("headless") or r["id"] in self.answered
-                    or not call_decisions(r)):
-                continue
+                    or r.get("status") == "not spoken: remote session" or not call_decisions(r)):
+                continue  # a project-started session: its project thread relays what needs the user
             if r.get("kind") == "approve":
                 key = "approve:" + r["id"]
             elif r.get("kind") == "project":

@@ -899,6 +899,11 @@ class SummaryQueueTests(unittest.TestCase):
             f.write(json.dumps({"type": "user", "timestamp": iso(call_ts + 20),
                                 "message": {"content": [{"type": "text", "text": "1A, 2B"}]}}) + "\n")
         self.assertAlmostEqual(voiced.user_turn_after(t, call_ts), call_ts + 20, delta=1)
+        t.write_text("\n".join(json.dumps(x) for x in lines) + "\n", encoding="utf-8")
+        with t.open("a", encoding="utf-8") as f:  # a project-started session: the answer arrives as a wake
+            f.write(json.dumps({"type": "user", "timestamp": iso(call_ts + 30), "message": {"content": [
+                {"type": "text", "text": '<wake reason="mention"><message>1A</message></wake>'}]}}) + "\n")
+        self.assertAlmostEqual(voiced.user_turn_after(t, call_ts), call_ts + 30, delta=1)
 
     def test_headless_flag_from_hook(self):
         it = self.vq.say("x", cwd="C:/a", message="hi there friend", entrypoint="claude-desktop", headless=True)
