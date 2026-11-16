@@ -3573,7 +3573,7 @@ class Widget:
         y += ch + p(14)
         y = slider("speed", "Speaking speed", [0.9, 1.0, 1.1, 1.25, 1.4], ["0.9\u00d7", "Normal", "1.1\u00d7",
                                                                           "1.25\u00d7", "1.4\u00d7"], y)
-        y = toggle("say_source", "Say which project first", "\u201cFrom agentic os v2.\u201d before each reply", y)
+        y = toggle("say_source", "Say which project first", "\u201cFrom my app.\u201d before each reply", y)
         y = toggle("summaries", "Summarize replies", "Off: read a cleaned-up excerpt instead", y)
         y = toggle("speak_background", "Speak background runs", "Batch and headless runs (always in history)", y)
         y = toggle("speak_remote_sessions", "Speak project sessions",

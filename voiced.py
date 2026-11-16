@@ -246,7 +246,7 @@ def plain_speech(text: str) -> str:
 
 
 SUMMARY_PROMPT = """You write the spoken voiceover for one reply from an AI agent working for the user.
-the user hears it through a speaker while doing something else. It must save him time.
+The user hears it through a speaker while doing something else. It must save them time.
 
 Write JSON only, no prose around it, with exactly these keys:
 {{"speak": true or false,
@@ -463,7 +463,7 @@ def combined_answer(decs: list[dict], answers: list[str | None]) -> str:
     """One message back to the session with every answer, so the agent never acts on half of them."""
     if len(decs) == 1:
         return answers[0] if answers[0] else SKIPPED
-    lines = ["the user's answers to your questions:"]
+    lines = ["The user's answers to your questions:"]
     for n, (dec, ans) in enumerate(zip(decs, answers), 1):
         lines.append(f"{n}. {dec['question']}")
         lines.append(f"   Answer: {ans if ans else SKIPPED}")
@@ -833,7 +833,7 @@ class VoiceQueue:
             os.replace(tmp, self._answers_path)
 
     def answer_push(self, item: dict, text: str) -> dict | None:
-        """the user picked an option (or typed) on a pushed call: queue it for the thread. The call stays open,
+        """The user picked an option (or typed) on a pushed call: queue it for the thread. The call stays open,
         marked as sent, until the thread reports DONE."""
         cid, text = item.get("push_id") or "", " ".join(str(text or "").split())[:2000]
         if not cid or not text:
@@ -993,7 +993,7 @@ class VoiceQueue:
                 self._player.seek_to(max(0.0, min(1.0, fraction)))
                 if not self.paused:
                     self._player.play()
-    def preview(self, text: str = "Hi the user. This is how replies will sound.") -> dict:
+    def preview(self, text: str = "Hi. This is how replies will sound.") -> dict:
         """Play a sample now (voice settings). Not kept in history."""
         item = {"id": uuid.uuid4().hex[:12], "ts": time.time(), "text": text, "project": "Voice preview",
                 "replay_of": "preview", "no_source": True, "status": "queued", "cwd": "", "session_id": ""}
@@ -1613,7 +1613,7 @@ _ACTIVE: list = [0.0, 0.0, {}]  # [built at, for hours, {session id: project}]
 
 
 def active_sessions(hours: float, root: Path | None = None, ttl: float = 30) -> dict:
-    """Threads the user worked in lately: he typed into it (latestUserFrameAt) or opened it (lastFocusedAt) in the
+    """Threads the user worked in lately: they typed into it (latestUserFrameAt) or opened it (lastFocusedAt) in the
     Claude app within `hours`. {cli session id: project}. Cached for 30 s."""
     if not hours:
         return {}
