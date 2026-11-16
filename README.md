@@ -1,6 +1,6 @@
-# Ember Voice Player
+# Claude VoicePlayer
 
-A local voice for Claude Code. When a session finishes a turn, Ember Voice Player reads a short summary of the
+A local voice for Claude Code. When a session finishes a turn, Claude VoicePlayer reads a short summary of the
 reply aloud and shows a small floating player. When a reply asks you to choose something, the player shows it
 as a **call** with clickable answers, and sends your answer back to that session.
 
@@ -12,6 +12,8 @@ real time). No API keys and no cloud TTS.
 > player and the call features are tested on Windows 10/11 only.
 
 Made by [MadeFire AI](https://madefire.ai).
+
+Not affiliated with or endorsed by Anthropic. Claude is a trademark of Anthropic.
 
 ---
 
@@ -31,8 +33,8 @@ Made by [MadeFire AI](https://madefire.ai).
 ### 1. Clone
 
 ```
-git clone https://github.com/yprimakov/ember-voice-player.git
-cd ember-voice-player
+git clone https://github.com/yprimakov/claude-voice-player.git
+cd claude-voice-player
 ```
 
 ### 2. Run the setup script
@@ -106,7 +108,7 @@ picked. The daemon listens on 127.0.0.1 only and refuses requests from browsers.
 | --- | --- |
 | Nothing speaks | Does `~\.claude\voice_enabled` exist? Is the player muted (M)? Run `doctor.bat` |
 | Replies are read word for word, not summarized | The `claude` CLI was not found on PATH. Install Claude Code's CLI, or turn off "Summarize replies" |
-| The player is gone | Run `show_player.pyw`, or check the taskbar button "Ember Voice Player" |
+| The player is gone | Run `show_player.pyw`, or check the taskbar button "Claude VoicePlayer" |
 | Model download failed | Download the two files from the kokoro-onnx releases page into `models\` and run `setup.py` again |
 | `onnxruntime` DLL errors | Use plain `onnxruntime`, not `onnxruntime-directml` (it hangs with Kokoro on some AMD systems) |
 | A second copy will not start | Only one daemon can run. `curl http://127.0.0.1:4712/state` shows the running one |
@@ -241,12 +243,12 @@ project for an hour, minimize to an orb, clear the queue, quit. Esc or X hides i
 **Minimize** (the dash button in the panel header, the dash that appears when you hover the capsule, or
 right-click > "Minimize to an orb") shrinks the player
 to a 40 px glossy ember orb that slides to the nearest side of the screen. It pulses while a reply speaks,
-shows calls waiting as a small pill, and grows a little on hover (tooltip: "Ember Voice Player · 2 calls").
+shows calls waiting as a small pill, and grows a little on hover (tooltip: "Claude VoicePlayer · 2 calls").
 Click it and the player comes back exactly where it was; drag it and it settles on the nearest edge again.
 The minimized state survives a restart. A new call
 restores the player only when "Open the panel when a call arrives" is on.
 
-**Bring it back**: the Start menu shortcut **Ember Voice Player** (`show_player.pyw`, icon in
+**Bring it back**: the Start menu shortcut **Claude VoicePlayer** (`show_player.pyw`, icon in
 `assets/ember-voice.ico`) restores a hidden or minimized player, or starts the daemon if it is down.
 Scripts can do the same with `POST /show`. Keys (after
 clicking the player): Space pause, Right skip, M mute, 1-9 pick an option.

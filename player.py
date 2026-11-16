@@ -765,7 +765,7 @@ class MiniOrb:
         self.w._tip_hide()
         if on:
             calls = (self.state or (0, 0))[1]
-            text = "Ember Voice Player" + (f" · {calls} call{'s' if calls != 1 else ''}" if calls else "")
+            text = "Claude VoicePlayer" + (f" · {calls} call{'s' if calls != 1 else ''}" if calls else "")
             first = (self.w._calls or [None])[0] if calls else None
             if first:  # which thread is first in line
                 text += "\n" + self.w._fit(self.w._where(first, "Next: {}"), self.w.F["meta"], self.w.p(300))
@@ -865,7 +865,7 @@ class Widget:
         self.root = root = tk.Tk()
         root.report_callback_exception = lambda *exc: api.log(
             "player error: " + "".join(__import__("traceback").format_exception(*exc))[-1500:])
-        root.title("Ember Voice Player")
+        root.title("Claude VoicePlayer")
         try:
             root.iconbitmap(default=str(Path(__file__).with_name("assets") / "ember-voice.ico"))
         except Exception:
@@ -1826,7 +1826,7 @@ class Widget:
         is active minimizes it, and the player hides with it; a click or Alt+Tab brings the player back."""
         tk = self.tk
         a = tk.Toplevel(self.root)
-        a.title("Ember Voice Player")
+        a.title("Claude VoicePlayer")
         a.geometry("1x1+-32000+-32000")
         try:
             a.attributes("-alpha", 0.0)
@@ -3639,7 +3639,7 @@ class Widget:
             y += self._mf_logo.height() + p(12)
         except Exception as e:  # cosmetic: the text below still says it
             self.api.log(f"wordmark: {e!r}")
-        c.create_text(mid, y, anchor="n", text="Ember Voice Player is made by MadeFire AI", font=self.F["meta"],
+        c.create_text(mid, y, anchor="n", text="Claude VoicePlayer is made by MadeFire AI", font=self.F["meta"],
                       fill=MUTED, tags=("set",))
         y += self.F["meta"].metrics("linespace") + p(6)
         t = c.create_text(mid, y, anchor="n", text="madefire.ai ↗", font=self.F["link"], fill=EMBER,
