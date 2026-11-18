@@ -113,6 +113,7 @@ GLYPHS = {  # Segoe Fluent Icons on Windows, plain symbols elsewhere
 STATUS_TAGS = {"not spoken: headless run": "background", "not spoken: muted": "muted",
                "not spoken: project muted": "project muted", "not spoken: do not disturb": "do not disturb",
                "not spoken: nothing to say": "no update", "not spoken: grouped": "grouped", "not spoken: found waiting": "waiting",
+               "not spoken: project session": "project session",
                "skipped": "skipped", "cleared": "cleared", "removed": "removed"}
 BACKGROUND = ("not spoken: headless run", "not spoken: grouped", "not spoken: nothing to say")
 
@@ -2782,6 +2783,12 @@ class Widget:
             self.answered.add(i)
             self.vq.history.update(i, answer=text, answered_at=time.time(),
                                    **({"answers": answers} if answers else {}))
+        if item.get("via_thread"):  # a Claude Project's session: its owner answers in the project thread
+            self._copy(text)
+            self.api.open_session(item)
+            self._toast(f"Copied. Paste it in the {item.get('project')} thread")
+            self._after_call()
+            return
         mode = self.cfg.get("desktop_answers")
         app_id = getattr(self.api, "desktop_app_id", None)
         if mode in ("send", "paste") and app_id and app_id(item):

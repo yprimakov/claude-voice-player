@@ -629,7 +629,32 @@ class VoiceQueue:
         return self._summarizer if self.settings.get("summaries") else None
 
     # -- intake
-    QUIET_CALLS = ("muted", "project muted", "do not disturb", "found waiting")  # summarized, not spoken
+    QUIET_CALLS = ("muted", "project muted", "do not disturb", "found waiting", "project session")  # summarized, not spoken
+
+    def _project_names(self, project_id: str, thread_id: str) -> tuple[str, str]:
+        """A Claude Project's name and a thread's title, as calls pushed from that project named them."""
+        name = title = ""
+        for r in self.history.recent(1500):  # newest first
+            if r.get("kind") != "project":
+                continue
+            if not name and project_id and f"/project/{project_id}" in (r.get("url") or ""):
+                name = r.get("project") or ""
+            if not title and thread_id and r.get("thread_id") == thread_id:
+                title = r.get("thread") or ""
+            if name and (title or not thread_id):
+                break
+        return name, title
+
+    def _project_session(self, item: dict) -> None:
+        """A session a Claude Project started: label it with the project, and answer it in the project thread
+        (its owner talks to it there; typing into the local session would go around the thread)."""
+        o = project_origin(item["session_id"], item["cwd"])
+        name, title = self._project_names(o.get("project_id", ""), o.get("thread_id", ""))
+        item.update(project=name or "Claude project", spoken=name or "a Claude project", via_thread=True,
+                    thread_id=o.get("thread_id", ""), url=project_link("", o.get("project_id", ""),
+                                                                         o.get("thread_id", "")))
+        if title:
+            item["thread"] = title
 
     def say(self, text: str, cwd: str = "", session_id: str = "", entrypoint: str = "",
             silent: str = "", message: str = "", headless: bool = False, host: dict | None = None,
@@ -654,12 +679,13 @@ class VoiceQueue:
                 item["text"] = "Finished with technical output. The details are in the session."
         if not silent and src["headless"] and not (self.speak_headless or self.settings.get("speak_background")):
             silent = "headless run"
-        if not silent and not self.settings.get("speak_remote_sessions"):
-            try:
-                if remote_spawned(session_id):
-                    silent = "remote session"  # logged, not spoken, no call (not in QUIET_CALLS)
-            except Exception as e:
-                log(f"remote check: {e!r}")
+        try:
+            if remote_spawned(session_id) and not src["headless"]:
+                self._project_session(item)
+                if not silent and not self.settings.get("speak_remote_sessions"):
+                    silent = "project session"  # shown, and its questions become a silent call; not spoken
+        except Exception as e:
+            log(f"project session: {e!r}")
         if not silent and self.muted:
             silent = "muted"
         if not silent and self.quiet.get(src.get("project", ""), 0) > time.time():
@@ -881,7 +907,7 @@ class VoiceQueue:
         for r in rows:
             sid = r.get("session_id") or ""
             if (decisions_of(r) and not r.get("answer") and not r.get("dismissed") and not sid.startswith("cloud:")
-                    and remote_spawned(sid)):
+                    and not r.get("via_thread") and remote_spawned(sid)):
                 self.history.update(r["id"], dismissed=True)
                 log(f"call {r['id']} ({r.get('project')}) closed: from a project session")
 
@@ -1428,6 +1454,42 @@ def pending_question(path: Path | None, tail: int = 262144) -> tuple[str, list[d
 _REMOTE: dict[str, tuple[float, bool]] = {}  # cli session id -> (checked at, spawned remotely)
 
 
+def project_child(rc) -> bool:
+    """`remoteControlSpawn` of a session a Claude Project (or another program) started. A session the user
+    started himself with Remote Control on has the key too, with rcChild and createdByProgram false."""
+    return isinstance(rc, dict) and bool(rc.get("projectThreadChild") or rc.get("createdByProgram")
+                                         or rc.get("rcChild"))
+
+
+_ORIGIN: dict[str, dict] = {}  # cli session id -> {"project_id", "thread_id"}
+# raw transcript lines keep the JSON escapes (\" and \n), so they are optional here
+_WAKE_IDS = re.compile(r'<project id=\\?"(chan_\w{6,120})\\?"[^>]*>(?:\\n|\s)*<thread ts=\\?"((?:cmsg|ses|session|cse)_\w{6,120})\\?"')
+
+
+def project_origin(session_id: str, cwd: str = "", tail: int = 524288) -> dict:
+    """The Claude Project and thread a project session works for now: the newest wake envelope in its
+    transcript (<project id="chan_..."><thread ts="cmsg_...">). One session can serve several threads, so the
+    tail is read each time; the whole file only when the tail has none and nothing is cached."""
+    p = transcript_path(cwd, session_id)
+    if not p:
+        return _ORIGIN.get(session_id, {})
+    try:
+        with p.open("rb") as f:
+            f.seek(0, 2)
+            size = f.tell()
+            f.seek(max(0, size - tail))
+            hits = _WAKE_IDS.findall(f.read().decode("utf-8", errors="replace"))
+            if not hits and session_id not in _ORIGIN and size > tail:
+                f.seek(0)
+                for line in f:  # ponytail: one full read per session, then the cache covers it
+                    hits += _WAKE_IDS.findall(line.decode("utf-8", errors="replace"))
+    except OSError:
+        hits = []
+    if hits:
+        _ORIGIN[session_id] = {"project_id": hits[-1][0], "thread_id": hits[-1][1]}
+    return _ORIGIN.get(session_id, {})
+
+
 def remote_spawned(session_id: str, root: Path | None = None, ttl: float = 300) -> bool:
     """A Claude app session started remotely (Remote Control, e.g. "Local session (from a project)"): its
     session file has `remoteControlSpawn`. Its owner talks to it through the project thread, which relays
@@ -1440,7 +1502,7 @@ def remote_spawned(session_id: str, root: Path | None = None, ttl: float = 300) 
     f, out = _desktop_files(root).get(session_id), False
     if f:
         try:
-            out = bool(json.loads(f.read_text(encoding="utf-8")).get("remoteControlSpawn"))
+            out = project_child(json.loads(f.read_text(encoding="utf-8")).get("remoteControlSpawn"))
         except (OSError, ValueError):
             out = False
     if root is None:
@@ -1470,7 +1532,7 @@ def waiting_sessions(root: Path | None = None, hours: float = 72, quiet_for: flo
         at = float(d.get("lastActivityAt") or 0) / 1000
         if not sid or d.get("isArchived") or now - at > hours * 3600:
             continue
-        if d.get("remoteControlSpawn") and not include_remote:
+        if project_child(d.get("remoteControlSpawn")) and not include_remote:
             continue  # a session a project started: the project thread relays what needs the user
         src = source_of(cwd)
         if src["project"] in ("pytest run", "temp folder") or cwd.replace("/", "\\").lower().startswith(own):
@@ -1775,7 +1837,7 @@ def open_session(item: dict) -> str:
     host = item.get("host") or {}
     kind, sid, cwd = host.get("kind"), item.get("session_id") or "", item.get("cwd") or ""
     try:
-        if item.get("kind") == "project":  # a call pushed from a Claude app Project thread: the app's project link
+        if item.get("kind") == "project" or item.get("via_thread"):  # a Claude app Project thread: its link
             url = item.get("url") or project_link(item.get("push_id") or "")
             os.startfile(url or "claude://")
             return "Opened the project in Claude" if url else "Opened Claude: find the thread there"
