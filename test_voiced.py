@@ -304,6 +304,11 @@ class RemoteSessionTests(unittest.TestCase):
             self.assertEqual((it["project"], it["thread"], it["via_thread"]), ("Sample Project", "Sample thread", True))
             self.assertEqual(it["url"], "claude://code/project/chan_SAMPLE0001?thread=cmsg_SAMPLE0001AAAA")
             self.assertIn("project session", vq.QUIET_CALLS)                  # its questions still become a call
+            voiced.project_origin = lambda sid, cwd="": {"asked": "Sample question from the owner"}  # ids redacted
+            it2 = vq.say("Push it?", "C:/x/proj", "11111111-2222-3333-4444-555555555555")
+            self.assertEqual((it2["project"], it2["thread"], it2["url"], it2["via_thread"], it2["project_session"]),
+                             ("proj (project session)", "Sample question from the owner", "", False, True))
+            voiced.project_origin = lambda sid, cwd="": {"project_id": "chan_SAMPLE0001", "thread_id": "cmsg_SAMPLE0001AAAA"}
             self.assertIsNone(vq.add_waiting("11111111-2222-3333-4444-555555555555", "C:/x/proj", "Claude needs your permission"))
             self.assertEqual(vq.say("Done.", "C:/x/proj", "66666666-7777-8888-9999-000000000000")["status"], "queued")
             old_call = {"id": "oc1", "ts": time.time(), "session_id": "11111111-2222-3333-4444-555555555555",

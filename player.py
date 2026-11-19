@@ -2783,10 +2783,11 @@ class Widget:
             self.answered.add(i)
             self.vq.history.update(i, answer=text, answered_at=time.time(),
                                    **({"answers": answers} if answers else {}))
-        if item.get("via_thread"):  # a Claude Project's session: its owner answers in the project thread
+        if item.get("via_thread") or item.get("project_session"):  # a Claude Project's session: answered in
+            # its project thread (or, with no thread link, where the session is open), never typed in behind it
             self._copy(text)
             self.api.open_session(item)
-            self._toast(f"Copied. Paste it in the {item.get('project')} thread")
+            self._toast("Copied. Paste it in the project thread" if item.get("url") else "Copied. Paste it in the session")
             self._after_call()
             return
         mode = self.cfg.get("desktop_answers")
