@@ -793,6 +793,16 @@ class SpeechTests(unittest.TestCase):
         self.assertIn("2. Name?\n   Answer: " + voiced.SKIPPED, msg)
         self.assertIn("3. Ship?\n   Answer: Yes", msg)
         self.assertEqual(voiced.combined_answer(decs[:1], ["NAS"]), "NAS")
+        # the review step's note goes last, labeled; an empty or blank note changes nothing
+        noted = voiced.combined_answer(decs, ["Nightly", None, "Yes"], "  Also back up the wiki.\nThen ping me. ")
+        self.assertTrue(noted.startswith(msg))
+        self.assertTrue(noted.endswith("\n\nAlso: Also back up the wiki.\nThen ping me."))
+        self.assertEqual(voiced.combined_answer(decs, ["Nightly", None, "Yes"], "  \n "), msg)
+        self.assertEqual(voiced.combined_answer(decs[:1], [None], "Use the NAS"), voiced.SKIPPED + "\n\nAlso: Use the NAS")
+        # cloud groups answer call by call: the note rides on the last real answer, or on the last call
+        self.assertEqual(voiced.answers_with_note(["A", "B", None], "more"), ["A", "B\n\nAlso: more", None])
+        self.assertEqual(voiced.answers_with_note([None, None], "more"), [None, voiced.SKIPPED + "\n\nAlso: more"])
+        self.assertEqual(voiced.answers_with_note(["A", None], ""), ["A", None])
         self.assertEqual(voiced.decisions_of({"decision": decs[0]}), decs[:1])
         self.assertEqual(voiced.decisions_of({"decisions": decs, "decision": decs[0]}), decs)
 

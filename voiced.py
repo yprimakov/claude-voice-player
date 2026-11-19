@@ -459,15 +459,32 @@ def call_decisions(item: dict) -> list[dict]:
 SKIPPED = "(skipped: use your judgment)"
 
 
-def combined_answer(decs: list[dict], answers: list[str | None]) -> str:
+def with_note(text: str, note: str | None) -> str:
+    """The user's extra context or requests, as a labeled last part. An empty note changes nothing."""
+    note = (note or "").strip()
+    return f"{text}\n\nAlso: {note}" if note else text
+
+
+def combined_answer(decs: list[dict], answers: list[str | None], note: str | None = None) -> str:
     """One message back to the session with every answer, so the agent never acts on half of them."""
     if len(decs) == 1:
-        return answers[0] if answers[0] else SKIPPED
+        return with_note(answers[0] if answers[0] else SKIPPED, note)
     lines = ["The user's answers to your questions:"]
     for n, (dec, ans) in enumerate(zip(decs, answers), 1):
         lines.append(f"{n}. {dec['question']}")
         lines.append(f"   Answer: {ans if ans else SKIPPED}")
-    return "\n".join(lines)
+    return with_note("\n".join(lines), note)
+
+
+def answers_with_note(answers: list[str | None], note: str | None) -> list[str | None]:
+    """Cloud groups send one answer per call: the note rides on the last real one (or the last call)."""
+    out = list(answers)
+    if not (note or "").strip() or not out:
+        return out
+    real = [i for i, a in enumerate(out) if a and a != SKIPPED]
+    i = real[-1] if real else len(out) - 1
+    out[i] = with_note(out[i] if real else SKIPPED, note)
+    return out
 
 
 class Summarizer:
