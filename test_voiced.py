@@ -254,25 +254,56 @@ class PushTests(unittest.TestCase):
 
 
 class RemoteSessionTests(unittest.TestCase):
-    def test_project_sessions_make_no_calls(self):
+    def test_project_origin_reads_the_newest_wake(self):
+        root = Path(tempfile.mkdtemp())
+        d = root / "C--x-proj"
+        d.mkdir()
+        wake = lambda t: json.dumps({"type": "user", "message": {"content":
+            f'<wake reason="mention"><project id="chan_SAMPLE0001" type="project">\n  <thread ts="{t}">hi'}})
+        (d / "sid-1.jsonl").write_text("\n".join([wake("cmsg_SAMPLE0001AAAA"), '{"type": "assistant"}',
+                                                  wake("cmsg_SAMPLE0001BBBB")]) + "\n")
+        old = voiced.transcript_path
+        voiced.transcript_path = lambda cwd, sid, root=None: d / f"{sid}.jsonl"
+        try:
+            self.assertEqual(voiced.project_origin("sid-1"),
+                             {"project_id": "chan_SAMPLE0001", "thread_id": "cmsg_SAMPLE0001BBBB"})
+        finally:
+            voiced.transcript_path = old
+            voiced._ORIGIN.pop("sid-1", None)
+
+    def test_project_sessions_show_quietly(self):
         root = Path(tempfile.mkdtemp())
         d = root / "a" / "b"
         d.mkdir(parents=True)
         base = {"cwd": "C:/x/proj", "lastActivityAt": time.time() * 1000 - 120000, "isArchived": False}
         (d / "local_1.json").write_text(json.dumps({"cliSessionId": "11111111-2222-3333-4444-555555555555", **base,
-                                                    "remoteControlSpawn": {"ccrSessionId": "cse_x"}}))
+                                                    "remoteControlSpawn": {"ccrSessionId": "cse_x", "rcChild": True,
+                                                                           "projectThreadChild": True}}))
         (d / "local_2.json").write_text(json.dumps({"cliSessionId": "66666666-7777-8888-9999-000000000000", **base}))
+        # started by the user himself with Remote Control on: a normal session
+        (d / "local_3.json").write_text(json.dumps({"cliSessionId": "77777777-7777-8888-9999-000000000000", **base,
+                                                    "remoteControlSpawn": {"ccrSessionId": "cse_y", "rcChild": False,
+                                                                           "createdByProgram": False}}))
         self.assertTrue(voiced.remote_spawned("11111111-2222-3333-4444-555555555555", root))
         self.assertFalse(voiced.remote_spawned("66666666-7777-8888-9999-000000000000", root))
+        self.assertFalse(voiced.remote_spawned("77777777-7777-8888-9999-000000000000", root))
         self.assertFalse(voiced.remote_spawned("", root))
-        old = voiced.remote_spawned
+        old, old_origin = voiced.remote_spawned, voiced.project_origin
         voiced.remote_spawned = lambda sid, root=None, ttl=300: sid.startswith("1111")
+        voiced.project_origin = lambda sid, cwd="": {"project_id": "chan_SAMPLE0001", "thread_id": "cmsg_SAMPLE0001AAAA"}
         try:
             st = voiced.Settings()
             st.update(summaries=False)
             vq = voiced.VoiceQueue(voiced.History(Path(tempfile.mkdtemp()) / "h.jsonl"), fake_synth, FakePlayer,
                                    settings=st)
-            self.assertEqual(vq.say("Should I?", "C:/x/proj", "11111111-2222-3333-4444-555555555555")["status"], "not spoken: remote session")
+            vq.history.add({"id": "push1", "ts": time.time() - 60, "kind": "project", "project": "Sample Project",
+                            "url": "claude://code/project/chan_SAMPLE0001?thread=cmsg_SAMPLE0001AAAA",
+                            "thread_id": "cmsg_SAMPLE0001AAAA", "thread": "Sample thread", "answer": "done"})
+            it = vq.say("Should I?", "C:/x/proj", "11111111-2222-3333-4444-555555555555")
+            self.assertEqual(it["status"], "not spoken: project session")    # shown, not spoken
+            self.assertEqual((it["project"], it["thread"], it["via_thread"]), ("Sample Project", "Sample thread", True))
+            self.assertEqual(it["url"], "claude://code/project/chan_SAMPLE0001?thread=cmsg_SAMPLE0001AAAA")
+            self.assertIn("project session", vq.QUIET_CALLS)                  # its questions still become a call
             self.assertIsNone(vq.add_waiting("11111111-2222-3333-4444-555555555555", "C:/x/proj", "Claude needs your permission"))
             self.assertEqual(vq.say("Done.", "C:/x/proj", "66666666-7777-8888-9999-000000000000")["status"], "queued")
             old_call = {"id": "oc1", "ts": time.time(), "session_id": "11111111-2222-3333-4444-555555555555",
@@ -280,11 +311,13 @@ class RemoteSessionTests(unittest.TestCase):
             vq.history.add(old_call)
             vq._close_remote(vq.history.recent(10))
             self.assertTrue(vq.history.get("oc1")["dismissed"])           # stale project-session calls close
+            self.assertFalse(vq.history.get(it["id"]).get("dismissed"))   # the labeled ones stay
             st.update(speak_remote_sessions=True)                        # the setting brings them back
-            self.assertEqual(vq.say("Again?", "C:/x/proj", "11111111-2222-3333-4444-555555555555")["status"], "queued")
+            again = vq.say("Again?", "C:/x/proj", "11111111-2222-3333-4444-555555555555")
+            self.assertEqual((again["status"], again["project"]), ("queued", "Sample Project"))
             vq.stop()
         finally:
-            voiced.remote_spawned = old
+            voiced.remote_spawned, voiced.project_origin = old, old_origin
 
 
 class OpenSessionTests(unittest.TestCase):
