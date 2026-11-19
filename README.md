@@ -224,7 +224,8 @@ reply is speaking. Three sizes:
   When one reply asks several questions they stay together as one call ("Question 1 of 3"): answer or skip
   (S) each one, check them on the review step (click a row to change it), then **Send answers** (Enter)
   delivers them to the session in one message. Nothing is sent until then, so the agent never acts on half
-  the answers.
+  the answers. The "Anything else?" box on the review step adds extra context or requests: they go last in
+  the same message, after "Also:" (Enter makes a new line, Ctrl+Enter sends).
   Under each question, "About:" opens the context: a sentence or two on what the question refers to,
   any pictures the reply points at (click to open), links to previews, and the full reply, so there's no
   need to open the session first.

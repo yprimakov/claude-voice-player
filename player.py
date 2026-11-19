@@ -25,7 +25,8 @@ import threading
 import time
 from pathlib import Path
 
-from voiced import SKIPPED, active_sessions, call_decisions, combined_answer, decisions_of, thread_title
+from voiced import (SKIPPED, active_sessions, answers_with_note, call_decisions, combined_answer, decisions_of,
+                    thread_title)
 
 _HERE = Path(__file__).resolve().parent
 
@@ -1439,6 +1440,15 @@ class Widget:
                                 font=self.F["snip"], padx=0, pady=0, cursor="arrow", insertwidth=0,
                                 selectbackground=BRONZE, spacing1=0, spacing3=self.p(4))
         self.ctx_win = c.create_window(0, 0, anchor="nw", window=self.ctx_text, tags=("pan", "ask"))
+        # the review step's note: extra context or requests sent with the answers (Enter = new line)
+        self.note = tk.Text(c, bg=CARD_HI, fg=FG, insertbackground=FG, relief="flat", bd=0, highlightthickness=0,
+                            wrap="word", font=self.F["entry"], padx=0, pady=0, undo=True, selectbackground=BRONZE)
+        self.note_win = c.create_window(0, 0, anchor="nw", window=self.note, tags=("pan", "ask"))
+        self.note.bind("<Control-Return>", lambda e: self._note_send())
+        self.note.bind("<FocusIn>", lambda e: (self._touch(), self._note_focus(True)))
+        self.note.bind("<FocusOut>", lambda e: self._note_focus(False))
+        self.note.bind("<Escape>", lambda e: self.root.focus_set())
+        self._note_cid, self._note_box = None, None
         self._ctx_shown = False
         self._hint = "Another option, or ask a follow-up"
         self.entry.insert(0, self._hint)
@@ -1494,9 +1504,9 @@ class Widget:
             root.bind(str(i), lambda e, i=i: self._key(lambda: self._pick_number(i)))
 
     def _key(self, fn):
-        if self.root.focus_get() is self.entry:
+        if self.root.focus_get() in (self.entry, self.note):
             return
-        self._last_key = time.time()                  # keyboard actions never animate
+        self._last_key = time.time()                 # keyboard actions never animate
         fn()
 
     def _icon_button(self, name, glyph, cmd, tip):
@@ -2453,7 +2463,27 @@ class Widget:
 
     def _send_all(self, call):
         decs, d = self._draft(call)
-        self._answer(call, combined_answer(decs, d["answers"]), answers=list(d["answers"]))
+        note = self.note.get("1.0", "end").strip() if self._note_cid == self._call_id(call) else ""
+        self.note.delete("1.0", "end")
+        self._note_cid = None
+        if self.root.focus_get() is self.note:
+            self.root.focus_set()
+        answers = list(d["answers"])
+        if call.get("kind") == "project":  # one answer per pushed call: the note goes with the last one
+            answers = answers_with_note(answers, note)
+        self._answer(call, combined_answer(decs, d["answers"], note), answers=answers)
+
+    def _note_send(self):
+        item = self._call()
+        if item and self.mode == "panel" and self.view == "now":
+            decs, d = self._draft(item)
+            if len(decs) > 1 and d["ix"] >= len(decs):
+                self._send_all(item)
+        return "break"
+
+    def _note_focus(self, on):
+        if self._note_box:
+            self.c.itemconfigure(self._note_box, outline=EMBER if on else HAIR)
 
     def _set_hint(self, hint):
         if hint == self._hint:
@@ -2733,6 +2763,7 @@ class Widget:
                 ln = c.create_line(p(PAD), y - p(8), Wp - p(PAD), y - p(8), fill=HAIR, tags=("pan", "ask"))
                 self.chips.append((ln,))
         y += p(2)
+        y = self._call_note(call, d, y)
         bh = p(42)
         base = self.art.pill(maxw, bh, grad=ACC)
         hover = self.art.pill(maxw, bh, grad=ACC_HI)
@@ -2745,6 +2776,34 @@ class Widget:
         self._tipify("sendall", lambda: "One message with every answer (Enter)")
         self.chips.append((img, txt))
         return y + bh + p(4)
+
+    def _call_note(self, call, d, y):
+        """A box for anything else: extra context or requests, sent as the last part of the message."""
+        c, p, Wp = self.c, self.p, self.Wp
+        cid = self._call_id(call)
+        if self._note_cid != cid:  # another call's review: keep that call's note in its draft, show this one's
+            old = self._drafts.get(self._note_cid)
+            if old is not None:
+                old["note"] = self.note.get("1.0", "end").strip()
+            self.note.delete("1.0", "end")
+            self.note.insert("1.0", d.get("note", ""))
+            self._note_cid = cid
+        lbl = c.create_text(p(PAD), y, anchor="nw", text="ANYTHING ELSE?", font=self.F["mono"], fill=MUTED,
+                            tags=("pan", "ask"))
+        hint = c.create_text(Wp - p(PAD), y, anchor="ne", text="Ctrl+Enter sends", font=self.F["mono"], fill=FAINT,
+                             tags=("pan", "ask"))
+        y += self.F["mono"].metrics("linespace") + p(6)
+        inner = self.F["entry"].metrics("linespace") * 3
+        bh = inner + p(20)
+        box = c.create_rectangle(p(PAD), y, Wp - p(PAD), y + bh, fill=CARD_HI, width=1,
+                                 outline=EMBER if self.root.focus_get() is self.note else HAIR, tags=("pan", "ask"))
+        self._note_box = box
+        c.coords(self.note_win, p(PAD) + p(14), y + p(10))
+        c.itemconfigure(self.note_win, width=Wp - 2 * p(PAD) - p(28), height=inner)
+        c.tag_bind(box, "<Button-1>", lambda e: self.note.focus_set())
+        self._tipify(box, lambda: "Extra context or requests for the session, sent after the answers")
+        self.chips.append((lbl, hint, box))
+        return y + bh + p(12)
 
     def _send_typed(self):
         text = self.entry.get().strip()
@@ -3249,13 +3308,16 @@ class Widget:
             in_review = len(decs) > 1 and d["ix"] >= len(decs)
             for i in (self.entry_bg, self.entry_win, self.send_bg, self.send_g):
                 c.itemconfigure(i, state="hidden" if in_review else "normal")
+            c.itemconfigure(self.note_win, state="normal" if in_review else "hidden")
+            if not in_review and self.root.focus_get() is self.note:
+                self.root.focus_set()
             c.itemconfigure(self.question, state="hidden" if in_review else "normal")
             c.tag_lower("askhit", self.glow_cap)
         c.itemconfigure(self.ctx_win, state="normal" if (call and self._ctx_shown) else "hidden")
         if call and len(self._calls) < 2:
             for it in (self.call_nav, self.call_prev, self.call_next, *self._nav_bg.values()):
                 c.itemconfigure(it, state="hidden")
-        if not call and self.root.focus_get() is self.entry:
+        if not call and self.root.focus_get() in (self.entry, self.note):
             self.root.focus_set()
 
         # library
