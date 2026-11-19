@@ -650,9 +650,13 @@ class VoiceQueue:
         (its owner talks to it there; typing into the local session would go around the thread)."""
         o = project_origin(item["session_id"], item["cwd"])
         name, title = self._project_names(o.get("project_id", ""), o.get("thread_id", ""))
-        item.update(project=name or "Claude project", spoken=name or "a Claude project", via_thread=True,
-                    thread_id=o.get("thread_id", ""), url=project_link("", o.get("project_id", ""),
-                                                                         o.get("thread_id", "")))
+        url = project_link("", o.get("project_id", ""), o.get("thread_id", ""))
+        # no project id (the transcript can hold it redacted): name it by its folder, and a click opens the
+        # local session instead of a bare Claude window
+        name = name or (f"{item.get('project')} (project session)" if item.get("project") else "Project session")
+        item.update(project=name, spoken=name.replace(" (project session)", ""), via_thread=bool(url),
+                    project_session=True, thread_id=o.get("thread_id", ""), url=url)
+        title = title or item.get("thread") or o.get("asked", "")
         if title:
             item["thread"] = title
 
@@ -1487,7 +1491,33 @@ def project_origin(session_id: str, cwd: str = "", tail: int = 524288) -> dict:
         hits = []
     if hits:
         _ORIGIN[session_id] = {"project_id": hits[-1][0], "thread_id": hits[-1][1]}
+    if not _ORIGIN.get(session_id, {}).get("project_id"):
+        asked = _wake_text(p)
+        if asked:
+            _ORIGIN[session_id] = {**_ORIGIN.get(session_id, {}), "asked": asked}
     return _ORIGIN.get(session_id, {})
+
+
+_WAKE_MSG = re.compile(r'trust=\\?"principal\\?"[^>]*>((?:(?!</message|<attachment).){1,400})')
+
+
+def _wake_text(p: Path, tail: int = 524288) -> str:
+    """The newest message the project's owner sent this session (its wake envelope), as a short label."""
+    try:
+        with p.open("rb") as f:
+            f.seek(0, 2)
+            size = f.tell()
+            f.seek(max(0, size - tail))
+            hits = _WAKE_MSG.findall(f.read().decode("utf-8", errors="replace"))
+            if not hits and size > tail:  # ponytail: a full read when the last wake is older than the tail
+                f.seek(0)
+                hits = _WAKE_MSG.findall(f.read().decode("utf-8", errors="replace"))
+    except OSError:
+        return ""
+    if not hits:
+        return ""
+    t = re.sub(r"\\[nrt]|\s+", " ", hits[-1]).replace('\\"', '"').replace("&#39;", "'").strip()
+    return (t[:77] + "...") if len(t) > 80 else t
 
 
 def remote_spawned(session_id: str, root: Path | None = None, ttl: float = 300) -> bool:
@@ -1837,7 +1867,7 @@ def open_session(item: dict) -> str:
     host = item.get("host") or {}
     kind, sid, cwd = host.get("kind"), item.get("session_id") or "", item.get("cwd") or ""
     try:
-        if item.get("kind") == "project" or item.get("via_thread"):  # a Claude app Project thread: its link
+        if item.get("kind") == "project" or (item.get("via_thread") and item.get("url")):  # a Project thread
             url = item.get("url") or project_link(item.get("push_id") or "")
             os.startfile(url or "claude://")
             return "Opened the project in Claude" if url else "Opened Claude: find the thread there"
