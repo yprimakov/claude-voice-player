@@ -749,7 +749,7 @@ class SettingsTests(unittest.TestCase):
             c = [x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4 for x in c]
             return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
         for name, t in player.THEMES.items():
-            self.assertEqual(set(t), keys, name)
+            self.assertEqual(set(t) - set(player.OPTIONAL), keys, name)
             def ratio(x, y):
                 a, b = sorted((lum(x), lum(y)))
                 return (b + 0.05) / (a + 0.05)

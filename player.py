@@ -47,6 +47,10 @@ INK = (255, 255, 255)                          # faint outlines and hover washes
 GLOW_WARM, GLOW_COOL = (245, 158, 11), (20, 184, 166)  # the card's ambient light
 ACC, ACC_HI, ACC_INK, ACC_RGB = ("#F59E0B", "#EA580C"), ("#FBBF24", "#F59E0B"), "#0b0b0d", (245, 158, 11)  # filled buttons
 SW_KNOB = "#fffaf0"
+# only a theme with its own badge and orb colours sets these
+CHIP = None                                    # option pills and quiet badges: (fill, text, outline)
+ORB_FIRE, ORB_INK = ((234, 88, 12), (245, 158, 11), (253, 214, 110)), "#0b0b0d"  # the orb, rim to heart; its glyph
+OPTIONAL = dict(CHIP=CHIP, ORB_FIRE=ORB_FIRE, ORB_INK=ORB_INK)
 ORB_GLASS = (32, 27, 22)                       # the idle orb's dark glass
 
 # Themes set the card, text, hairline and ambient light. The pulse colour is its own setting.
@@ -64,10 +68,13 @@ THEMES = {
                      BODY="#dbe4f0", MUTED="#94a3b8", FAINT="#7d8aa0", EMBER="#93c5fd", INK=(255, 255, 255),
                      GLOW_WARM=(59, 130, 246), GLOW_COOL=(14, 165, 233), ORB_GLASS=(17, 26, 46),
                      ACC=("#60a5fa", "#3b82f6"), ACC_HI=("#93c5fd", "#60a5fa"), ACC_INK="#0b1220", ACC_RGB=(96, 165, 250), SW_KNOB="#f8fafc"),
-    "daylight": dict(CARD="#f9f5ea", CARD_HI="#fffdf7", HOVER="#f1ebdc", HAIR="#e3dccb", FG="#1c1917",
-                     BODY="#36302a", MUTED="#5c564f", FAINT="#6b645c", EMBER="#a1520a", INK=(60, 40, 10),
-                     GLOW_WARM=(245, 158, 11), GLOW_COOL=(20, 184, 166), ORB_GLASS=(255, 250, 238),
-                     ACC=("#F59E0B", "#F97316"), ACC_HI=("#FBBF24", "#F59E0B"), ACC_INK="#1c1917", ACC_RGB=(217, 119, 6), SW_KNOB="#fffdf7"),
+    # MadeFire light: warm cream, never pure white or black, one deep flame
+    "daylight": dict(CARD="#F7F1E8", CARD_HI="#FBF7F1", HOVER="#FBE3D6", HAIR="#E4E4E7", FG="#07060B",
+                     BODY="#1F1A22", MUTED="#5E5560", FAINT="#6A616C", EMBER="#B8320C", INK=(7, 6, 11),
+                     GLOW_WARM=(242, 176, 143), GLOW_COOL=(251, 227, 214), ORB_GLASS=(251, 247, 241),
+                     ACC=("#B8320C", "#8F2A0C"), ACC_HI=("#C73B12", "#A0300D"), ACC_INK="#FBF7F1", ACC_RGB=(184, 50, 12), SW_KNOB="#FBF7F1",
+                     CHIP=("#FBE3D6", "#8F2A0C", "#F2B08F"), ORB_INK="#FBF7F1",
+                     ORB_FIRE=((143, 42, 12), (184, 50, 12), (226, 96, 48))),
     # MadeFire design system v5 "Night and Flame": Night, Dusk, Smoke, Ember Ash; Bone text, Ash muted; flame gradient
     "madefire": dict(CARD="#110D18", CARD_HI="#1B1522", HOVER="#2A2130", HAIR="#2E2633", FG="#F4EDE6",
                      BODY="#E4DCD5", MUTED="#B3A8A1", FAINT="#938890", EMBER="#FFB25B", INK=(244, 237, 230),
@@ -86,21 +93,45 @@ THEME_FONTS = {  # bundled OFL fonts first (fonts/), Windows fonts as fallback i
                  ("VQ Inter", "Segoe UI Variable Text", "Segoe UI"),
                  ("VQ Inter Medium", "Segoe UI Variable Text Semibold", "Segoe UI Semibold"),
                  ("VQ JetBrains Mono", "Cascadia Mono", "Consolas")),
-    "daylight": (("VQ Fraunces Semibold", "Sitka Heading Semibold", "Georgia"),
-                 ("VQ Fraunces Medium", "Sitka Subheading Semibold", "Georgia"),
-                 ("VQ DM Sans",), ("VQ DM Sans Medium",), ("VQ JetBrains Mono",)),
+    "daylight": (("VQ Outfit Bold",), ("VQ Outfit Semibold",), ("VQ DM Sans",), ("VQ DM Sans Medium",), ("VQ JetBrains Mono",)),
     "madefire": (("VQ Outfit Bold",), ("VQ Outfit Semibold",), ("VQ DM Sans",), ("VQ DM Sans Medium",),
                  ("VQ JetBrains Mono",)),  # v5 type: Outfit headings, DM Sans body, JetBrains Mono
 }
 # (headings, body): Inter, Space Grotesk and Fraunces run wider than Outfit/DM Sans at the same size, so a step
 # smaller keeps the layout's metrics (no new truncation at Narrow + L)
-THEME_FONT_SCALE = {"graphite": (0.95, 0.95), "midnight": (0.95, 0.95), "daylight": (0.94, 1.0)}
+THEME_FONT_SCALE = {"graphite": (0.95, 0.95), "midnight": (0.95, 0.95)}
 THEME_NAMES = {"ember": "Ember", "graphite": "Graphite", "midnight": "Midnight", "daylight": "Daylight", "madefire": "MadeFire"}
+
+# Spotlight and shimmer. Themes in FX have their own light; the others use their accent when the setting says "all".
+FX = {
+    "madefire": dict(fill=((246, 162, 86), 0.05), rim=((247, 138, 59), 0.75), hi=0.32,
+                     glows=(((255, 107, 44), 0.09), ((232, 71, 26), 0.07), ((194, 55, 15), 0.05), ((255, 107, 44), 0.05))),
+    "daylight": dict(fill=((184, 50, 12), 0.04), rim=((184, 50, 12), 0.6), hi=0.18,
+                     glows=(((184, 50, 12), 0.045), ((143, 42, 12), 0.038), ((194, 55, 15), 0.028), ((184, 50, 12), 0.028))),
+}
+DRIFT = ((26, 0.22, 0.12, 0.28, 0.20), (38, 0.80, 0.30, -0.26, 0.24), (51, 0.35, 0.85, 0.30, -0.22),
+         (44, 0.75, 0.80, -0.20, -0.26))  # per glow: period s, start x, start y, drift x, drift y (of the panel)
+
+
+def fx_of(theme: str, setting: str):
+    """The theme's light, or None when the setting turns it off there."""
+    if setting == "off" or (setting != "all" and theme not in FX):
+        return None
+    a = ACC_RGB
+    return FX.get(theme) or dict(fill=(a, 0.05), rim=(a, 0.75), hi=0.32,
+                                 glows=((a, 0.07), (a, 0.05), (a, 0.04), (a, 0.04)))
+
+
+def drift_at(i: int, t: float) -> tuple:
+    """Glow i's centre at time t, as fractions of the panel: out and back, ease-in-out."""
+    period, x, y, dx, dy = DRIFT[i]
+    k = 0.5 - 0.5 * math.cos(math.pi * t / period)
+    return x + dx * k, y + dy * k
 
 
 def apply_theme(name: str) -> None:
     """Point the colour names at a theme. Everything reads them when it draws, so a rebuild repaints all."""
-    globals().update(THEMES.get(name) or THEMES["ember"])
+    globals().update({**OPTIONAL, **(THEMES.get(name) or THEMES["ember"])})
 EDGE_HOT = "#8a5410"  # rim colour at the top of a breath
 
 W = 384           # logical px
@@ -219,6 +250,11 @@ class Art:
         return ph
 
     @staticmethod
+    def mul(a, b):
+        from PIL import ImageChops
+        return ImageChops.multiply(a, b)
+
+    @staticmethod
     def _rgba(c: str, a: int = 255):
         return (*_rgb(c), a)
 
@@ -242,20 +278,20 @@ class Art:
                 n = d * SS
                 ball = I.new("RGBA", (n, n), (0, 0, 0, 0))
                 dr = D.Draw(ball)
-                dr.ellipse((0, 0, n - 1, n - 1), fill=(245, 158, 11, 130))
+                dr.ellipse((0, 0, n - 1, n - 1), fill=(*ORB_FIRE[1], 130))
                 k = int(SS * 1.5)
                 dr.ellipse((k, k, n - 1 - k, n - 1 - k), fill=(*ORB_GLASS, 255))
                 out.alpha_composite(self._down(ball, d, d), (g, g))
                 return out
             a = int(70 + 120 * level)
             D.Draw(halo).ellipse((g - self.p(3), g - self.p(3), g + d + self.p(3), g + d + self.p(3)),
-                                 fill=(245, 158, 11, a))
+                                 fill=(*ORB_FIRE[1], a))
             out.alpha_composite(halo.filter(F.GaussianBlur(g / 2.4)))
             n = d * SS
             ball = I.new("RGBA", (n, n), (0, 0, 0, 0))
             dr = D.Draw(ball)
             stops = ([(0, (92, 52, 14)), (0.6, (138, 84, 16)), (1, (176, 116, 30))] if dim else
-                     [(0, (234, 88, 12)), (0.55, (245, 158, 11)), (1, (253, 214, 110))])
+                     list(zip((0, 0.55, 1), ORB_FIRE)))
             hx, hy = n * 0.36, n * 0.30
             steps = 56
             for i in range(steps):
@@ -415,8 +451,10 @@ class Art:
                        (self.p(20), -self.p(20), self.p(120), (*GLOW_COOL, 16))] if kind == "cap" else
                       [(w - self.p(40), -self.p(50), self.p(190), (*GLOW_WARM, 44)),
                        (self.p(10), self.p(40), self.p(150), (*GLOW_COOL, 12))])
+            light = sum(_rgb(CARD)) > 384
             for x, y, r, col in lights:
-                layer = I.new("RGBA", (w, h), (0, 0, 0, 0))
+                # the blur mixes in this clear colour: black would leave grey smudges on a light card
+                layer = I.new("RGBA", (w, h), (*col[:3], 0) if light else (0, 0, 0, 0))
                 D.Draw(layer).ellipse((x - r, y - r, x + r, y + r), fill=col)
                 im.alpha_composite(layer.filter(F.GaussianBlur(r / 2.2)))
             line = I.new("RGBA", (w, 1), (0, 0, 0, 0))
@@ -429,6 +467,34 @@ class Art:
             return im
         self._cache[("glow_make", w, h, kind)] = make
         return self.get(("glow", w, h, kind), lambda: self.glow_pil(w, h, kind, make))
+
+    def falloff(self, r: int, peak: float, power: float = 1.6):
+        """A soft disc of radius r as an L mask, `peak` (0..1) in the middle, 0 at the edge."""
+        key = ("falloff", r, round(peak, 3), power)
+        if key not in self._cache:
+            g = self.I.radial_gradient("L").resize((2 * r, 2 * r), self.I.BICUBIC)
+            self._cache[key] = g.point([round(255 * peak * (1 - v / 255) ** power) for v in range(256)])
+        return self._cache[key]
+
+    def disc(self, r: int, rgb: tuple, peak: float, power: float = 1.6):
+        """A soft colour disc as a Tk image."""
+        def make():
+            im = self.I.new("RGBA", (2 * r, 2 * r), (*rgb, 0))
+            im.putalpha(self.falloff(r, peak, power))
+            return im
+        return self.get(("disc", r, rgb, round(peak, 3), power), make)
+
+    def rimlight(self, box: tuple, x: int, y: int, fx: dict, k: float):
+        """The spotlight on the rim, for the card area `box` with the pointer at x, y: flame, then white on top."""
+        I = self.I
+        r1, r2 = self.p(132), self.p(82)
+        area = lambda r: (box[0] - x + r, box[1] - y + r, box[2] - x + r, box[3] - y + r)
+        im = I.new("RGBA", (box[2] - box[0], box[3] - box[1]), (*fx["rim"][0], 0))
+        im.putalpha(self.falloff(r1, fx["rim"][1] * k, 1.2).crop(area(r1)))
+        top = I.new("RGBA", im.size, (255, 255, 255, 0))
+        top.putalpha(self.falloff(r2, fx["hi"] * k, 1.2).crop(area(r2)))
+        im.alpha_composite(top)
+        return im
 
     def glow_pil(self, w: int, h: int, kind: str, make=None):
         """The ambient light as a Pillow image (CornerGlass samples it)."""
@@ -489,8 +555,8 @@ class CornerGlass:
         self.r, self.quads, self.alpha, self.shown = 0, None, 0.0, False
         self._cache: dict = {}
 
-    def _render(self, r: int, edge: str, band, backdrop):
-        key = (r, edge, band or backdrop[0])
+    def _render(self, r: int, edge: str, band, backdrop, light=None):
+        key = (r, edge, band or backdrop[0], light and light[0])
         if key not in self._cache:
             if len(self._cache) > 300:   # the rim pulse makes a new colour every frame
                 self._cache.clear()
@@ -502,6 +568,9 @@ class CornerGlass:
             D.Draw(rim).ellipse((0, 0, n - 1, n - 1), fill=255)
             D.Draw(rim).ellipse((SS, SS, n - 1 - SS, n - 1 - SS), fill=0)
             col.paste(_rgb(edge), (0, 0, n, n), rim)
+            if light:  # the spotlight on the rim's curve
+                col.paste(light[1].convert("RGB").resize((n, n), I.NEAREST), (0, 0),
+                          self.art.mul(rim, light[1].getchannel("A").resize((n, n), I.NEAREST)))
             a = I.new("L", (n, n), 0)
             da = D.Draw(a)
             da.ellipse((0, 0, n - 1, n - 1), fill=255)
@@ -563,13 +632,13 @@ class CornerGlass:
             g.DeleteDC(mem)
             u.ReleaseDC(None, screen)
 
-    def shape(self, r: int, edge: str, band, backdrop):
+    def shape(self, r: int, edge: str, band, backdrop, light=None):
         """band: flat colour just inside the rim (the inner glow while it pulses), or None to use
         backdrop = (key, 2r x 2r RGB image): the card and its ambient light under the four corners."""
         r = int(r or 0)
         if r < 1:
             return
-        self.r, self.quads = r, self._render(r, edge, band, backdrop)
+        self.r, self.quads = r, self._render(r, edge, band, backdrop, light)
         self._push(True)
 
     def sync(self):
@@ -826,7 +895,7 @@ class MemSettings:
                    "say_source": True, "speak_background": False, "speak_remote_sessions": False, "auto_open_calls": True,
                    "hide_when_idle": False, "calls_hours": 24, "desktop_answers": "send",
                    "pulse_with_voice": True, "rim_color": "#F59E0B", "glow_size": 12,
-                   "player_width": 1.0, "theme": "ember", "minimized": False, "reduce_motion": False,
+                   "spotlight": "madefire", "player_width": 1.0, "theme": "ember", "minimized": False, "reduce_motion": False,
                    "pinned_projects": [], "pinned_threads": [], "active_hours": 2, "layout": "classic"}
 
     def get(self, k):
@@ -845,7 +914,7 @@ class MemSettings:
 
 RIM_NAMES = {"#F59E0B": "Promethean Amber", "#EA580C": "Cooled Ember", "#FBBF24": "Ember Light",
              "#F43F5E": "Rose", "#8B5CF6": "Violet", "#3B82F6": "Blue", "#14B8A6": "Teal", "#E5E7EB": "White",
-             "#FF6B2C": "Flame"}
+             "#FF6B2C": "Flame", "#B8320C": "Deep Flame"}
 WIDTH_NAMES = {0.85: "Narrow", 1.0: "Default", 1.2: "Wide", 1.4: "Wider"}
 SIZE_NAMES = {0.85: "Small", 1.0: "Default", 1.15: "Large", 1.3: "Larger", 1.5: "Largest"}
 VOICE_NAMES = {"af_heart": "Heart", "af_bella": "Bella", "af_nicole": "Nicole", "af_sarah": "Sarah",
@@ -946,6 +1015,7 @@ class Widget:
         self._glass = None                  # CornerGlass (Windows), made on first show
         self._mini = None                   # MiniOrb while minimized
         self._use_glass = sys.platform == "win32"
+        root.bind("<Motion>", self._spot_motion, add="+")
         root.bind("<Configure>", lambda e: e.widget is root and self._glass and self._glass.sync(), add="+")
 
         self._build()
@@ -955,7 +1025,8 @@ class Widget:
 
     def _look(self):
         """The settings that need a full redraw when they change."""
-        return (self.cfg.get("text_size"), self.cfg.get("player_width"), self.cfg.get("theme"))
+        return (self.cfg.get("text_size"), self.cfg.get("player_width"), self.cfg.get("theme"),
+                self.cfg.get("spotlight"))
 
     def _scale_setup(self):
         """Sizes and fonts for the current text size setting (all of the player scales with it)."""
@@ -1296,6 +1367,7 @@ class Widget:
         self.rim_l = c.create_line(0, 0, 0, self.h, fill=HAIR, tags=("bg",))
         self.rim_r = c.create_line(Wp - 1, 0, Wp - 1, self.h, fill=HAIR, tags=("bg",))
         self.rim_b = c.create_line(0, self.h - 1, Wp, self.h - 1, fill=HAIR, tags=("bg",))
+        self._fx_build()
         for ev, fn in (("<ButtonPress-1>", self._drag_start), ("<B1-Motion>", self._drag), ("<Button-3>", self._menu),
                        ("<Double-Button-1>", self._double)):
             c.tag_bind("bg", ev, fn)
@@ -1303,7 +1375,7 @@ class Widget:
 
         # orb (shared by both sizes; it glides between them)
         self.orb = c.create_image(0, 0, image=self.art.orb(0, dim=True), tags=("orb",))
-        self.orb_g = c.create_text(0, 0, text=self.glyph("play"), font=self.F["icon_orb"], fill=OBSIDIAN, tags=("orb",))
+        self.orb_g = c.create_text(0, 0, text=self.glyph("play"), font=self.F["icon_orb"], fill=ORB_INK, tags=("orb",))
         c.tag_bind("orb", "<Button-1>", lambda e: self._orb_click())
         c.tag_bind("orb", "<Enter>", lambda e: self._orb_hover(True))
         c.tag_bind("orb", "<Leave>", lambda e: self._orb_hover(False))
@@ -1762,10 +1834,114 @@ class Widget:
         if not self._glass or not self._radius:
             return
         band, bd = self._band(), self._backdrop()
-        key = (self._radius, self._edge, band or bd[0])
+        light = self._corner_light()
+        key = (self._radius, self._edge, band or bd[0], light and light[0])
         if key != getattr(self, "_glass_key", None):
             self._glass_key = key
-            self._glass.shape(self._radius, self._edge or HAIR, band, bd)
+            self._glass.shape(self._radius, self._edge or HAIR, band, bd, light)
+
+    # ---------------------------------------------------------- spotlight and shimmer
+    SPOT_IN, SPOT_OUT = 0.3, 0.45   # seconds
+
+    def _fx_build(self):
+        """Light items over the card and its hit areas, under all content: drifting glows, the pointer's wash, its light on the rim."""
+        c = self.c
+        # a loop from before a rebuild keeps running and just finds the new items
+        self._fx_imgs = []
+        self._fx = fx_of(self.cfg.get("theme"), self.cfg.get("spotlight"))
+        self._spot_k, self._spot_at = 0.0, None
+        self._drift_items, self._spot_fill, self._spot_rim = [], None, []
+        if not self._fx:
+            return
+        for rgb, peak in self._fx["glows"]:
+            self._drift_items.append(c.create_image(0, 0, image=self.art.disc(round(self.Wp * 0.42), rgb, peak),
+                                                    state="disabled", tags=("bg",)))
+        self._spot_fill = c.create_image(0, 0, state="hidden", tags=("bg",))
+        self._spot_rim = [c.create_image(0, 0, anchor="nw", state="hidden", tags=("bg", "spotrim")) for _ in range(4)]
+        self._drift_place(time.time())
+        self._drift_kick()
+
+    def _drift_place(self, t: float):
+        for i, item in enumerate(self._drift_items):
+            x, y = drift_at(i, t)
+            self.c.coords(item, round(x * self.Wp), round(y * self.h))
+
+    def _drift_kick(self):
+        if not getattr(self, "_drift_job", None):
+            self._drift_job = self.root.after(250, self._drift)
+
+    def _drift(self):
+        """4 frames a second (about 2 px a step, unseen on a soft glow), only while the player is on screen and motion is on."""
+        self._drift_job = None
+        if not self._drift_items or self._reduced() or not self._visible:
+            return  # _tick_once starts it again
+        self._drift_place(time.time())
+        self._drift_kick()
+
+    def _spot_motion(self, e=None):
+        if self._fx and not getattr(self, "_spot_job", None):
+            self._spot_seen = time.perf_counter()
+            self._spot_job = self.root.after(1, self._spot)
+
+    def _spot(self):
+        """Follow the pointer at about 30 fps while it is over the player, then fade out and stop."""
+        self._spot_job = None
+        if not self._fx:
+            return
+        now = time.perf_counter()
+        dt, self._spot_seen = min(0.1, now - self._spot_seen), now
+        x, y = self.root.winfo_pointerx() - self.root.winfo_rootx(), self.root.winfo_pointery() - self.root.winfo_rooty()
+        inside = self._visible and 0 <= x < self.Wp and 0 <= y < self.h
+        k = min(1.0, self._spot_k + dt / self.SPOT_IN) if inside else max(0.0, self._spot_k - dt / self.SPOT_OUT)
+        at = (x, y) if inside else self._spot_at
+        steady = k == self._spot_k and at == self._spot_at
+        if at and not steady:
+            self._spot_draw(at, k)
+        if inside or k > 0:
+            self._spot_job = self.root.after(100 if steady else 33, self._spot)
+
+    def _spot_draw(self, at: tuple, k: float):
+        c, fx, (x, y) = self.c, self._fx, at
+        self._spot_at, self._spot_k = at, k
+        lvl = round(k * 10) / 10  # ten fade steps: the sprites are cached
+        if not lvl:
+            c.itemconfigure(self._spot_fill, state="hidden")
+            c.itemconfigure("spotrim", state="hidden", image="")
+            self._glass_shape()
+            return
+        c.itemconfigure(self._spot_fill, image=self.art.disc(self.p(165), fx["fill"][0], fx["fill"][1] * lvl),
+                        state="disabled")
+        c.coords(self._spot_fill, x, y)
+        r, w, h, reach, imgs = self._radius or 0, self.Wp, self.h, self.p(132), []
+        c.tag_raise("spotrim", self.glow_pan)
+        for item, (x0, y0, x1, y1) in zip(self._spot_rim, ((r, 0, w - r, 1), (r, h - 1, w - r, h),
+                                                           (0, r, 1, h - r), (w - 1, r, w, h - r))):
+            x0, x1 = max(x0, x - reach), min(x1, x + reach)
+            y0, y1 = max(y0, y - reach), min(y1, y + reach)
+            if x0 >= x1 or y0 >= y1:
+                c.itemconfigure(item, state="hidden", image="")  # never keep a name Tk has dropped
+                continue
+            img = self.art.TK.PhotoImage(self.art.rimlight((x0, y0, x1, y1), x, y, fx, lvl))
+            imgs.append(img)
+            c.coords(item, x0, y0)
+            c.itemconfigure(item, image=img, state="disabled")
+        self._fx_imgs = imgs  # Tk keeps no reference of its own
+        self._glass_shape()
+
+    def _corner_light(self):
+        """(key, RGBA quadrants of a 2r square): the spotlight on the corners' rim, or None when out of reach."""
+        k, at, r = round(getattr(self, "_spot_k", 0.0) * 10) / 10, getattr(self, "_spot_at", None), self._radius
+        if not k or not at or not self._fx:
+            return None
+        (x, y), w, h, reach = at, self.Wp, self.h, self.p(132)
+        out, near = None, []
+        for (cx, cy), q in zip(((0, 0), (w - r, 0), (0, h - r), (w - r, h - r)), ((0, 0), (r, 0), (0, r), (r, r))):
+            if max(cx - x, 0, x - cx - r) ** 2 + max(cy - y, 0, y - cy - r) ** 2 >= reach ** 2:
+                continue
+            out = out or self.art.I.new("RGBA", (2 * r, 2 * r), (0, 0, 0, 0))
+            out.paste(self.art.rimlight((cx, cy, cx + r, cy + r), x, y, self._fx, k), q)
+            near.append((cx - x, cy - y))
+        return ((k, tuple(near)), out) if out else None
 
     def _set_alpha(self, a: float):
         self.root.attributes("-alpha", a)
@@ -2716,14 +2892,20 @@ class Widget:
             if x > p(PAD) and x + w > Wp - p(PAD):
                 x, y = p(PAD), y + ch + p(8)
             label = self._ellipsize(label, font, tw + 1)
-            base = self.art.pill(w, ch, grad=ACC) if is_fill else self.art.pill(
-                w, ch, outline=(*INK, 36))
-            hover = self.art.pill(w, ch, grad=ACC_HI) if is_fill else self.art.pill(
-                w, ch, fill=(*INK, 14), outline=(*ACC_RGB, 120))
+            if is_fill:
+                base, hover, ink = self.art.pill(w, ch, grad=ACC), self.art.pill(w, ch, grad=ACC_HI), ACC_INK
+            elif CHIP:
+                base = self.art.pill(w, ch, fill=(*_rgb(CHIP[0]), 255), outline=(*_rgb(CHIP[2]), 255))
+                hover = self.art.pill(w, ch, fill=(*_rgb(CHIP[0]), 255), outline=(*ACC_RGB, 255))
+                ink = CHIP[1]
+            else:
+                base = self.art.pill(w, ch, outline=(*INK, 36))
+                hover = self.art.pill(w, ch, fill=(*INK, 14), outline=(*ACC_RGB, 120))
+                ink = FG
             tag = f"chip{n}"
             img = c.create_image(x, y, anchor="nw", image=base, tags=("pan", "ask", tag))
             txt = c.create_text(x + w / 2, y + ch / 2, text=label, font=font,
-                                fill=ACC_INK if is_fill else FG, tags=("pan", "ask", tag))
+                                fill=ink, tags=("pan", "ask", tag))
             c.tag_bind(tag, "<Button-1>", lambda e, o=opt, it=call: self._reply(it, o))
             c.tag_bind(tag, "<Enter>", lambda e, i=img, h=hover: (c.itemconfigure(i, image=h),
                                                                   c.configure(cursor="hand2")))
@@ -2984,6 +3166,8 @@ class Widget:
                     self._set_alpha(self._alpha())
                 except self.tk.TclError:
                     pass
+        if self._drift_items and self._visible and not self._reduced():
+            self._drift_kick()
         first = not hasattr(self, "_started")
         if first:
             self._started = True
@@ -3066,13 +3250,16 @@ class Widget:
         if badge:
             tw = self.F["mono_s"].measure(badge)
             bw, bh = tw + p(16), p(20)
-            img = self.art.pill(bw, bh, grad=ACC_HI) if filled else self.art.pill(
-                bw, bh, outline=(*INK, 40))
+            if CHIP and not filled:
+                img = self.art.pill(bw, bh, fill=(*_rgb(CHIP[0]), 255), outline=(*_rgb(CHIP[2]), 255))
+            else:
+                img = self.art.pill(bw, bh, grad=ACC_HI) if filled else self.art.pill(
+                    bw, bh, outline=(*INK, 40))
             self.c.itemconfigure(self.badge, image=img)
             self.c.coords(self.badge, right, p(CAP_H / 2))
             self.c.coords(self.badge_t, right - bw / 2, p(CAP_H / 2))
             self._text(self.badge_t, badge)
-            self._fill(self.badge_t, ACC_INK if filled else MUTED)
+            self._fill(self.badge_t, ACC_INK if filled else CHIP[1] if CHIP else MUTED)
             self._badge_left = right - bw
         else:
             self._badge_left = right + p(17)
@@ -3084,7 +3271,7 @@ class Widget:
 
         # orb glyph
         self.c.itemconfigure(self.orb_g, text=self.glyph("pause" if cur and not st["paused"] else "play"))
-        self._fill(self.orb_g, OBSIDIAN if (cur or q) else EMBER)
+        self._fill(self.orb_g, ORB_INK if (cur or q) else EMBER)
         self._fill(self.btn["mute"]["g"], self._btn_color("mute"))
         self._set_glyph("mute", "mute" if self.vq.muted else "volume")
 
@@ -3397,9 +3584,9 @@ class Widget:
     def _set(self, key, value):
         """Change one setting and apply it right away."""
         self.cfg.update(**{key: value})
-        if key == "theme" and value == "madefire":
-            self.cfg.update(rim_color="#FF6B2C")  # the MadeFire theme pulses in Flame
-        if key in ("text_size", "player_width", "theme"):
+        if key == "theme" and value in ("madefire", "daylight"):  # the MadeFire themes pulse in Flame
+            self.cfg.update(rim_color="#FF6B2C" if value == "madefire" else "#B8320C")
+        if key in ("text_size", "player_width", "theme", "spotlight"):
             self.root.after(10, self._rebuild)
             return
         if key == "opacity" and self._visible:
@@ -3442,6 +3629,7 @@ class Widget:
         self._layout_key = key
         self._end_slides()
         c.itemconfigure("pan", state="normal")
+        c.itemconfigure(self.lane_rule, state="hidden")
         for tag in ("play", "ask", "libtoggle"):
             c.itemconfigure(tag, state="hidden")
         c.itemconfigure(self.pan_arrow, state="hidden")
@@ -3636,6 +3824,11 @@ class Widget:
         y = swatches("rim_color", "Pulse color", y)
         y = slider("glow_size", "Glow size", [0, 6, 12, 18, 24], ["Rim only", "Small", "Medium", "Large", "Largest"], y)
         y = toggle("pulse_with_voice", "Pulse with the voice", "Off: a slow, steady breath while speaking", y)
+        y = choice("spotlight", "Spotlight & shimmer",
+                   [("madefire", "MadeFire themes"), ("all", "All themes"), ("off", "Off")],
+                   {"madefire": "A light follows the pointer, and faint glows drift, on MadeFire and Daylight",
+                    "all": "A light follows the pointer, and faint glows drift, in every theme",
+                    "off": "No pointer light and no drifting glows"}, y)
         y = toggle("reduce_motion", "Reduce motion", "Panels change at once; fades stay", y)
         y += p(14)
 
