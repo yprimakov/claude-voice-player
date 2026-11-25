@@ -2293,11 +2293,17 @@ class Widget:
         if cur:
             out.append(cur)
         if len(out) <= lines:
-            return " ".join(out)
+            return "\n".join(out)
         last = out[lines - 1]
         while last and font.measure(last + "…") > width:
             last = last.rsplit(" ", 1)[0] if " " in last else last[:-1]
-        return " ".join(out[:lines - 1] + [last.rstrip(" ,.;:") + "…"])
+        return "\n".join(out[:lines - 1] + [last.rstrip(" ,.;:") + "…"])
+
+    def _lane_text(self, text: str, width: int):
+        """The playback lane's three lines, broken here and not again by Tk: its own wrap differs by a pixel or a
+        word, and a fourth line would sit on the progress bar."""
+        self.c.itemconfigure(self.body, width=0)
+        self._text(self.body, self._clamp_lines(text, self.F["body"], width, 3))
 
     def _touch(self):
         self._touch_at = time.time()
@@ -3181,8 +3187,10 @@ class Widget:
         if playing or lane:
             txt = body_text if playing else "Nothing playing. New replies play here without moving your calls."
             if lane:  # a fixed-height lane: three lines, so the calls lane below never moves
-                txt = self._clamp_lines(txt, self.F["body"], Wp - 2 * p(PAD), 3)
-            self._text(self.body, txt)
+                self._lane_text(txt, Wp - 2 * p(PAD))
+            else:
+                c.itemconfigure(self.body, width=Wp - 2 * p(PAD))
+                self._text(self.body, txt)
             self._fill(self.body, BODY if playing else FAINT)
             c.coords(self.body, p(PAD), y)
             if lane:

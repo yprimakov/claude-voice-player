@@ -366,6 +366,22 @@ class ThemeTests(unittest.TestCase):
         out = self.w._clamp_lines(t, f, 200, 3)
         self.assertTrue(out.endswith("…"))
         self.assertEqual(self.w._clamp_lines("two words", f, 200, 3), "two words")
+        t = ("The sample guide is live and the presenter plan is ready, and I checked both on phone and desktop width. "
+             "Please do a dry run on the sample seats first, since the app steps are untested, and then tell me more.")
+        for width in range(250, 700, 3):  # drawn as is, never a fourth line: that one would sit on the bar
+            self.assertLessEqual(self.w._clamp_lines(t, f, width, 3).count("\n"), 2, width)
+
+    def test_lane_text_never_reaches_the_bar(self):
+        w = self.w
+        t = ("The sample guide is live and the presenter plan is ready, and I checked both on phone and desktop width. "
+             "Please do a dry run on the sample seats first, since the app steps are untested, and then tell me more.")
+        try:
+            for width in range(250, 700, 3):
+                w._lane_text(t, width)
+                x0, y0, x1, y1 = w.c.bbox(w.body)
+                self.assertLessEqual(y1 - y0, 3 * w.F["body"].metrics("linespace") + 2, width)
+        finally:
+            w._text(w.body, "")
 
     def test_thread_decisions_group_and_append(self):
         """Several replies from one thread, each with a Decisions block: one call, oldest first, a re-ask in
