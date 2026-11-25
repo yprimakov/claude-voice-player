@@ -493,6 +493,7 @@ class ThemeTests(unittest.TestCase):
             w._toggle_settings()
             self.pump()
             self.assertTrue(w.c.find_withtag("madeby"))
+            self.assertEqual(w.c.itemcget(w.lane_rule, "state"), "hidden")  # no Two lanes divider over the settings
             self.assertTrue(any(w.c.type(i) == "image" for i in w.c.find_withtag("madeby")))  # the wordmark
             w._toggle_settings()
         w._open_url(w.MADEFIRE_URL)
@@ -544,6 +545,8 @@ class ThemeTests(unittest.TestCase):
                 for end in t["ACC"] + t["ACC_HI"]:
                     self.assertGreaterEqual(ratio(t["ACC_INK"], end), 4.5)
                     self.assertGreaterEqual(ratio(t["SW_KNOB"], end), 1.3)  # the switch knob stands out
+                if t.get("CHIP"):
+                    self.assertGreaterEqual(ratio(t["CHIP"][1], t["CHIP"][0]), 4.5)
                 self.assertEqual(len(player.THEME_FONTS[name]), 5)
 
 

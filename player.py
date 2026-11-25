@@ -47,6 +47,10 @@ INK = (255, 255, 255)                          # faint outlines and hover washes
 GLOW_WARM, GLOW_COOL = (245, 158, 11), (20, 184, 166)  # the card's ambient light
 ACC, ACC_HI, ACC_INK, ACC_RGB = ("#F59E0B", "#EA580C"), ("#FBBF24", "#F59E0B"), "#0b0b0d", (245, 158, 11)  # filled buttons
 SW_KNOB = "#fffaf0"
+# only a theme with its own badge and orb colours sets these
+CHIP = None                                    # option pills and quiet badges: (fill, text, outline)
+ORB_FIRE, ORB_INK = ((234, 88, 12), (245, 158, 11), (253, 214, 110)), "#0b0b0d"  # the orb, rim to heart; its glyph
+OPTIONAL = dict(CHIP=CHIP, ORB_FIRE=ORB_FIRE, ORB_INK=ORB_INK)
 ORB_GLASS = (32, 27, 22)                       # the idle orb's dark glass
 
 # Themes set the card, text, hairline and ambient light. The pulse colour is its own setting.
@@ -68,7 +72,9 @@ THEMES = {
     "daylight": dict(CARD="#F7F1E8", CARD_HI="#FBF7F1", HOVER="#FBE3D6", HAIR="#E4E4E7", FG="#07060B",
                      BODY="#1F1A22", MUTED="#5E5560", FAINT="#6A616C", EMBER="#B8320C", INK=(7, 6, 11),
                      GLOW_WARM=(242, 176, 143), GLOW_COOL=(251, 227, 214), ORB_GLASS=(251, 247, 241),
-                     ACC=("#B8320C", "#8F2A0C"), ACC_HI=("#C73B12", "#A0300D"), ACC_INK="#FBF7F1", ACC_RGB=(184, 50, 12), SW_KNOB="#FBF7F1"),
+                     ACC=("#B8320C", "#8F2A0C"), ACC_HI=("#C73B12", "#A0300D"), ACC_INK="#FBF7F1", ACC_RGB=(184, 50, 12), SW_KNOB="#FBF7F1",
+                     CHIP=("#FBE3D6", "#8F2A0C", "#F2B08F"), ORB_INK="#FBF7F1",
+                     ORB_FIRE=((143, 42, 12), (184, 50, 12), (226, 96, 48))),
     # MadeFire design system v5 "Night and Flame": Night, Dusk, Smoke, Ember Ash; Bone text, Ash muted; flame gradient
     "madefire": dict(CARD="#110D18", CARD_HI="#1B1522", HOVER="#2A2130", HAIR="#2E2633", FG="#F4EDE6",
                      BODY="#E4DCD5", MUTED="#B3A8A1", FAINT="#938890", EMBER="#FFB25B", INK=(244, 237, 230),
@@ -87,15 +93,13 @@ THEME_FONTS = {  # bundled OFL fonts first (fonts/), Windows fonts as fallback i
                  ("VQ Inter", "Segoe UI Variable Text", "Segoe UI"),
                  ("VQ Inter Medium", "Segoe UI Variable Text Semibold", "Segoe UI Semibold"),
                  ("VQ JetBrains Mono", "Cascadia Mono", "Consolas")),
-    "daylight": (("VQ Fraunces Semibold", "Sitka Heading Semibold", "Georgia"),
-                 ("VQ Fraunces Medium", "Sitka Subheading Semibold", "Georgia"),
-                 ("VQ DM Sans",), ("VQ DM Sans Medium",), ("VQ JetBrains Mono",)),
+    "daylight": (("VQ Outfit Bold",), ("VQ Outfit Semibold",), ("VQ DM Sans",), ("VQ DM Sans Medium",), ("VQ JetBrains Mono",)),
     "madefire": (("VQ Outfit Bold",), ("VQ Outfit Semibold",), ("VQ DM Sans",), ("VQ DM Sans Medium",),
                  ("VQ JetBrains Mono",)),  # v5 type: Outfit headings, DM Sans body, JetBrains Mono
 }
 # (headings, body): Inter, Space Grotesk and Fraunces run wider than Outfit/DM Sans at the same size, so a step
 # smaller keeps the layout's metrics (no new truncation at Narrow + L)
-THEME_FONT_SCALE = {"graphite": (0.95, 0.95), "midnight": (0.95, 0.95), "daylight": (0.94, 1.0)}
+THEME_FONT_SCALE = {"graphite": (0.95, 0.95), "midnight": (0.95, 0.95)}
 THEME_NAMES = {"ember": "Ember", "graphite": "Graphite", "midnight": "Midnight", "daylight": "Daylight", "madefire": "MadeFire"}
 
 # Spotlight and shimmer. Themes in FX have their own light; the others use their accent when the setting says "all".
@@ -127,7 +131,7 @@ def drift_at(i: int, t: float) -> tuple:
 
 def apply_theme(name: str) -> None:
     """Point the colour names at a theme. Everything reads them when it draws, so a rebuild repaints all."""
-    globals().update(THEMES.get(name) or THEMES["ember"])
+    globals().update({**OPTIONAL, **(THEMES.get(name) or THEMES["ember"])})
 EDGE_HOT = "#8a5410"  # rim colour at the top of a breath
 
 W = 384           # logical px
@@ -274,20 +278,20 @@ class Art:
                 n = d * SS
                 ball = I.new("RGBA", (n, n), (0, 0, 0, 0))
                 dr = D.Draw(ball)
-                dr.ellipse((0, 0, n - 1, n - 1), fill=(245, 158, 11, 130))
+                dr.ellipse((0, 0, n - 1, n - 1), fill=(*ORB_FIRE[1], 130))
                 k = int(SS * 1.5)
                 dr.ellipse((k, k, n - 1 - k, n - 1 - k), fill=(*ORB_GLASS, 255))
                 out.alpha_composite(self._down(ball, d, d), (g, g))
                 return out
             a = int(70 + 120 * level)
             D.Draw(halo).ellipse((g - self.p(3), g - self.p(3), g + d + self.p(3), g + d + self.p(3)),
-                                 fill=(245, 158, 11, a))
+                                 fill=(*ORB_FIRE[1], a))
             out.alpha_composite(halo.filter(F.GaussianBlur(g / 2.4)))
             n = d * SS
             ball = I.new("RGBA", (n, n), (0, 0, 0, 0))
             dr = D.Draw(ball)
             stops = ([(0, (92, 52, 14)), (0.6, (138, 84, 16)), (1, (176, 116, 30))] if dim else
-                     [(0, (234, 88, 12)), (0.55, (245, 158, 11)), (1, (253, 214, 110))])
+                     list(zip((0, 0.55, 1), ORB_FIRE)))
             hx, hy = n * 0.36, n * 0.30
             steps = 56
             for i in range(steps):
@@ -1371,7 +1375,7 @@ class Widget:
 
         # orb (shared by both sizes; it glides between them)
         self.orb = c.create_image(0, 0, image=self.art.orb(0, dim=True), tags=("orb",))
-        self.orb_g = c.create_text(0, 0, text=self.glyph("play"), font=self.F["icon_orb"], fill=OBSIDIAN, tags=("orb",))
+        self.orb_g = c.create_text(0, 0, text=self.glyph("play"), font=self.F["icon_orb"], fill=ORB_INK, tags=("orb",))
         c.tag_bind("orb", "<Button-1>", lambda e: self._orb_click())
         c.tag_bind("orb", "<Enter>", lambda e: self._orb_hover(True))
         c.tag_bind("orb", "<Leave>", lambda e: self._orb_hover(False))
@@ -2882,14 +2886,20 @@ class Widget:
             if x > p(PAD) and x + w > Wp - p(PAD):
                 x, y = p(PAD), y + ch + p(8)
             label = self._ellipsize(label, font, tw + 1)
-            base = self.art.pill(w, ch, grad=ACC) if is_fill else self.art.pill(
-                w, ch, outline=(*INK, 36))
-            hover = self.art.pill(w, ch, grad=ACC_HI) if is_fill else self.art.pill(
-                w, ch, fill=(*INK, 14), outline=(*ACC_RGB, 120))
+            if is_fill:
+                base, hover, ink = self.art.pill(w, ch, grad=ACC), self.art.pill(w, ch, grad=ACC_HI), ACC_INK
+            elif CHIP:
+                base = self.art.pill(w, ch, fill=(*_rgb(CHIP[0]), 255), outline=(*_rgb(CHIP[2]), 255))
+                hover = self.art.pill(w, ch, fill=(*_rgb(CHIP[0]), 255), outline=(*ACC_RGB, 255))
+                ink = CHIP[1]
+            else:
+                base = self.art.pill(w, ch, outline=(*INK, 36))
+                hover = self.art.pill(w, ch, fill=(*INK, 14), outline=(*ACC_RGB, 120))
+                ink = FG
             tag = f"chip{n}"
             img = c.create_image(x, y, anchor="nw", image=base, tags=("pan", "ask", tag))
             txt = c.create_text(x + w / 2, y + ch / 2, text=label, font=font,
-                                fill=ACC_INK if is_fill else FG, tags=("pan", "ask", tag))
+                                fill=ink, tags=("pan", "ask", tag))
             c.tag_bind(tag, "<Button-1>", lambda e, o=opt, it=call: self._reply(it, o))
             c.tag_bind(tag, "<Enter>", lambda e, i=img, h=hover: (c.itemconfigure(i, image=h),
                                                                   c.configure(cursor="hand2")))
@@ -3234,13 +3244,16 @@ class Widget:
         if badge:
             tw = self.F["mono_s"].measure(badge)
             bw, bh = tw + p(16), p(20)
-            img = self.art.pill(bw, bh, grad=ACC_HI) if filled else self.art.pill(
-                bw, bh, outline=(*INK, 40))
+            if CHIP and not filled:
+                img = self.art.pill(bw, bh, fill=(*_rgb(CHIP[0]), 255), outline=(*_rgb(CHIP[2]), 255))
+            else:
+                img = self.art.pill(bw, bh, grad=ACC_HI) if filled else self.art.pill(
+                    bw, bh, outline=(*INK, 40))
             self.c.itemconfigure(self.badge, image=img)
             self.c.coords(self.badge, right, p(CAP_H / 2))
             self.c.coords(self.badge_t, right - bw / 2, p(CAP_H / 2))
             self._text(self.badge_t, badge)
-            self._fill(self.badge_t, ACC_INK if filled else MUTED)
+            self._fill(self.badge_t, ACC_INK if filled else CHIP[1] if CHIP else MUTED)
             self._badge_left = right - bw
         else:
             self._badge_left = right + p(17)
@@ -3252,7 +3265,7 @@ class Widget:
 
         # orb glyph
         self.c.itemconfigure(self.orb_g, text=self.glyph("pause" if cur and not st["paused"] else "play"))
-        self._fill(self.orb_g, OBSIDIAN if (cur or q) else EMBER)
+        self._fill(self.orb_g, ORB_INK if (cur or q) else EMBER)
         self._fill(self.btn["mute"]["g"], self._btn_color("mute"))
         self._set_glyph("mute", "mute" if self.vq.muted else "volume")
 
@@ -3608,6 +3621,7 @@ class Widget:
         self._layout_key = key
         self._end_slides()
         c.itemconfigure("pan", state="normal")
+        c.itemconfigure(self.lane_rule, state="hidden")
         for tag in ("play", "ask", "libtoggle"):
             c.itemconfigure(tag, state="hidden")
         c.itemconfigure(self.pan_arrow, state="hidden")
