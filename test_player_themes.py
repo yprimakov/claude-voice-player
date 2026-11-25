@@ -478,7 +478,7 @@ class ThemeTests(unittest.TestCase):
     def test_bundled_fonts_present_and_fallback(self):
         fonts = Path(player.__file__).with_name("fonts")
         for stem in ("VQInter", "VQInterMedium", "VQInterSemibold", "VQInterBold", "VQSpaceGroteskMedium",
-                     "VQSpaceGroteskBold", "VQFrauncesSemibold", "VQFrauncesMedium"):
+                     "VQSpaceGroteskBold", "VQFrauncesSemibold", "VQFrauncesMedium", "VQFrauncesLight", "VQOutfitMedium", "VQJetBrainsMonoTracked"):
             self.assertTrue((fonts / f"{stem}.ttf").exists(), stem)
         for lic in ("Inter", "SpaceGrotesk", "Fraunces"):
             self.assertIn("Open Font License", (fonts / f"OFL-{lic}.txt").read_text(encoding="utf-8"))
@@ -525,19 +525,44 @@ class ThemeTests(unittest.TestCase):
                 st.update(theme=theme, spotlight=setting)
                 w._rebuild()
                 self.assertEqual(bool(w._fx), on, (theme, setting))
-                self.assertEqual(len(w._drift_items), 4 if on else 0)
+                self.assertEqual(len(w._drift_items), len(w._fx["glows"]) if on else 0)
             st.update(theme="madefire", spotlight="madefire")
             w._rebuild()
             w._set_mode("panel")
             self.pump()
-            w._spot_draw((w.Wp - 3, 3), 1.0)  # at a corner: the rim and the corner's curve light up
+            w._spot = lambda: None  # the real pointer stays out of it
+            w._spot_draw((w.Wp - 3, 3))  # at a corner: the ring and the corner's curve light up
             self.assertEqual(w.c.itemcget(w._spot_fill, "state"), "disabled")
             self.assertIsNotNone(w._corner_light())
-            w._spot_draw((w.Wp // 2, 1), 1.0)  # mid top edge: only the top strip
-            self.assertEqual([w.c.itemcget(i, "state") for i in w._spot_rim][:2], ["disabled", "hidden"])
-            w._spot_draw((w.Wp // 2, 1), 0.0)
+            w._spot_draw((w.Wp // 2, -40))  # outside, over the top edge: its light still reaches the top strip
+            self.assertEqual([w.c.itemcget(i, "state") for i in w._spot_rim][:1], ["disabled"])
+            # text under the light: the item keeps its place and clicks, coloured pieces stand in, all comes back
+            t = w.pan_name
+            w.c.itemconfigure(t, text="sample")
+            fill, (x0, y0, x1, y1) = w.c.itemcget(t, "fill"), w.c.bbox(t)
+            at = ((x0 + x1) // 2, (y0 + y1) // 2)
+            w._text_light(at, None)
+            order = lambda: w.c.find_all().index(t) > w.c.find_all().index(w.sheet)
+            self.assertFalse(order())
+            self.assertEqual(w.c.itemcget(t, "fill"), fill)
+            self.assertEqual(w.c.bbox(t), (x0, y0, x1, y1))
+            w.c.event_generate("<Motion>", x=at[0], y=at[1])  # disabled pieces pass the pointer on
+            self.assertIn("panname", w.c.gettags("current"))
+            shown = [(w.c.coords(i)[0], w.c.itemcget(i, "text")) for i in w.c.find_withtag("sheen")
+                     if w.c.itemcget(i, "state") == "disabled" and abs(w.c.coords(i)[1] - y0) < 2]
+            self.assertIn("sample", "".join(s for _, s in sorted(shown)))
+            w._text_light(None, None)
+            self.assertTrue(order())
+            self.assertFalse([i for i in w.c.find_withtag("sheen") if w.c.itemcget(i, "state") != "hidden"])
+            w._spot_draw(None)
             self.assertEqual(w.c.itemcget(w._spot_fill, "state"), "hidden")
             self.assertIsNone(w._corner_light())
+            # ignite: each letter catches after the one before, then all rest
+            ig = player.FX["madefire"]["ig"]
+            self.assertIsNone(player.ignite(0, 0.3, "#ffffff", ig))
+            self.assertIsNotNone(player.ignite(0, 0.6, "#ffffff", ig))
+            self.assertIsNone(player.ignite(8, 0.6, "#ffffff", ig))
+            self.assertIsNone(player.ignite(0, 3.0, "#ffffff", ig))
             before = [w.c.coords(i) for i in w._drift_items]
             w._drift_place(0.0)
             first = [w.c.coords(i) for i in w._drift_items]
@@ -550,7 +575,32 @@ class ThemeTests(unittest.TestCase):
             self.assertTrue(w._fx)
             self.assertEqual(len(before), 4)
         finally:
+            w.__dict__.pop("_spot", None)
+            w._spot_job = None
             st.update(theme="ember", spotlight="madefire", reduce_motion=False)
+            w._rebuild()
+
+    def test_paper_sheet(self):
+        w, st = self.w, self.st
+        try:
+            st.update(theme="daylight")
+            w._rebuild()
+            for mode in ("cap", "panel"):
+                w._set_mode(mode)
+                self.pump()
+                w._set_height(w._target_h)
+                self.assertEqual(w._sheet_pil.size, (w.Wp, w._target_h))  # the linen covers the whole card
+                self.assertEqual(w.c.itemcget(w.sheet, "state"), "disabled")
+            self.assertGreater(len(w._sheet_pil.crop((100, 100, 160, 160)).getcolors(4000)), 8)  # it has a texture
+            row = w.art.foil(400, 120)  # the copper is brightest at the pointer
+            lum = [sum(row.getpixel((x, 0))) for x in range(400)]
+            self.assertLess(abs(lum.index(max(lum)) - 120), 6)
+            flat = w.art.sheet("daylight", 60, 60)
+            mean = [sum(flat.getpixel((x, y))[k] for x in range(60) for y in range(60)) / 3600 for k in range(3)]
+            for got, want in zip(mean, player._rgb(player.THEMES["daylight"]["CARD"])):
+                self.assertLess(abs(got - want), 8)  # CARD stays the sheet's mean: masks and mixes use it
+        finally:
+            st.update(theme="ember")
             w._rebuild()
 
     def test_theme_colours_are_readable(self):

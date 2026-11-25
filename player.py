@@ -50,7 +50,8 @@ SW_KNOB = "#fffaf0"
 # only a theme with its own badge and orb colours sets these
 CHIP = None                                    # option pills and quiet badges: (fill, text, outline)
 ORB_FIRE, ORB_INK = ((234, 88, 12), (245, 158, 11), (253, 214, 110)), "#0b0b0d"  # the orb, rim to heart; its glyph
-OPTIONAL = dict(CHIP=CHIP, ORB_FIRE=ORB_FIRE, ORB_INK=ORB_INK)
+LINE = None                                    # progress, sliders and rules, where ACC[0] is too pale (None = ACC[0])
+OPTIONAL = dict(CHIP=CHIP, ORB_FIRE=ORB_FIRE, ORB_INK=ORB_INK, LINE=LINE)
 ORB_GLASS = (32, 27, 22)                       # the idle orb's dark glass
 
 # Themes set the card, text, hairline and ambient light. The pulse colour is its own setting.
@@ -68,16 +69,16 @@ THEMES = {
                      BODY="#dbe4f0", MUTED="#94a3b8", FAINT="#7d8aa0", EMBER="#93c5fd", INK=(255, 255, 255),
                      GLOW_WARM=(59, 130, 246), GLOW_COOL=(14, 165, 233), ORB_GLASS=(17, 26, 46),
                      ACC=("#60a5fa", "#3b82f6"), ACC_HI=("#93c5fd", "#60a5fa"), ACC_INK="#0b1220", ACC_RGB=(96, 165, 250), SW_KNOB="#f8fafc"),
-    # MadeFire light: warm cream, never pure white or black, one deep flame
-    "daylight": dict(CARD="#F7F1E8", CARD_HI="#FBF7F1", HOVER="#FBE3D6", HAIR="#E4E4E7", FG="#07060B",
-                     BODY="#1F1A22", MUTED="#5E5560", FAINT="#6A616C", EMBER="#B8320C", INK=(7, 6, 11),
-                     GLOW_WARM=(242, 176, 143), GLOW_COOL=(251, 227, 214), ORB_GLASS=(251, 247, 241),
-                     ACC=("#B8320C", "#8F2A0C"), ACC_HI=("#C73B12", "#A0300D"), ACC_INK="#FBF7F1", ACC_RGB=(184, 50, 12), SW_KNOB="#FBF7F1",
-                     CHIP=("#FBE3D6", "#8F2A0C", "#F2B08F"), ORB_INK="#FBF7F1",
-                     ORB_FIRE=((143, 42, 12), (184, 50, 12), (226, 96, 48))),
+    # MadeFire design system v5, Paper: a linen sheet (SHEETS) with a copper foil edge. Ink, never black;
+    # Flame Paper for text, Flame for fills. CARD is the sheet's mean colour.
+    "daylight": dict(CARD="#F9F4EC", CARD_HI="#FFFBF5", HOVER="#EFE6DA", HAIR="#D8D1CA", FG="#1A1418",
+                     BODY="#1A1418", MUTED="#5E5560", FAINT="#6B6069", EMBER="#B8320C", INK=(26, 20, 24),
+                     GLOW_WARM=(255, 107, 44), GLOW_COOL=(240, 180, 136), ORB_GLASS=(255, 251, 245),
+                     ACC=("#FFB25B", "#FF6B2C"), ACC_HI=("#FFC678", "#FF8A47"), ACC_INK="#1A0904", ACC_RGB=(194, 55, 15), SW_KNOB="#1A1418",
+                     CHIP=("#FFFBF5", "#1A1418", "#C6BFB9"), LINE="#E2531A"),
     # MadeFire design system v5 "Night and Flame": Night, Dusk, Smoke, Ember Ash; Bone text, Ash muted; flame gradient
-    "madefire": dict(CARD="#110D18", CARD_HI="#1B1522", HOVER="#2A2130", HAIR="#2E2633", FG="#F4EDE6",
-                     BODY="#E4DCD5", MUTED="#B3A8A1", FAINT="#938890", EMBER="#FFB25B", INK=(244, 237, 230),
+    "madefire": dict(CARD="#1A151F", CARD_HI="#211A29", HOVER="#2A2130", HAIR="#352F38", FG="#F4EDE6",
+                     BODY="#E4DCD5", MUTED="#B3A8A1", FAINT="#978C94", EMBER="#FFB25B", INK=(244, 237, 230),
                      GLOW_WARM=(255, 107, 44), GLOW_COOL=(194, 55, 15), ORB_GLASS=(17, 13, 24),
                      ACC=("#FFB25B", "#FF6B2C"), ACC_HI=("#FFC678", "#FF8A47"), ACC_INK="#1A0904", ACC_RGB=(255, 107, 44), SW_KNOB="#110D18"),
 }
@@ -93,21 +94,39 @@ THEME_FONTS = {  # bundled OFL fonts first (fonts/), Windows fonts as fallback i
                  ("VQ Inter", "Segoe UI Variable Text", "Segoe UI"),
                  ("VQ Inter Medium", "Segoe UI Variable Text Semibold", "Segoe UI Semibold"),
                  ("VQ JetBrains Mono", "Cascadia Mono", "Consolas")),
-    "daylight": (("VQ Outfit Bold",), ("VQ Outfit Semibold",), ("VQ DM Sans",), ("VQ DM Sans Medium",), ("VQ JetBrains Mono",)),
-    "madefire": (("VQ Outfit Bold",), ("VQ Outfit Semibold",), ("VQ DM Sans",), ("VQ DM Sans Medium",),
+    "daylight": (("VQ Outfit Medium",), ("VQ Outfit Medium",), ("VQ DM Sans",), ("VQ DM Sans Medium",), ("VQ JetBrains Mono",)),
+    "madefire": (("VQ Outfit Medium",), ("VQ Outfit Medium",), ("VQ DM Sans",), ("VQ DM Sans Medium",),
                  ("VQ JetBrains Mono",)),  # v5 type: Outfit headings, DM Sans body, JetBrains Mono
 }
 # (headings, body): Inter, Space Grotesk and Fraunces run wider than Outfit/DM Sans at the same size, so a step
 # smaller keeps the layout's metrics (no new truncation at Narrow + L)
+V5 = ("daylight", "madefire")  # v5 type: tracked mono eyebrows; the question is the sheet's Fraunces statement
 THEME_FONT_SCALE = {"graphite": (0.95, 0.95), "midnight": (0.95, 0.95)}
 THEME_NAMES = {"ember": "Ember", "graphite": "Graphite", "midnight": "Midnight", "daylight": "Daylight", "madefire": "MadeFire"}
 
+# The card as the v5 design system draws a panel: a two-stop fill, firelight from the corners (colour, peak, corner x, y,
+# reach as a share of the card's width and height), and a texture tile (assets/, 2x): linen multiplies, grain lies on top.
+SHEETS = {
+    "madefire": dict(top=(33, 26, 41), bottom=(19, 16, 25), tile="grain", px=240,
+                     lights=(((255, 107, 44), 0.12, 0, 1, 0.54, 0.42), ((255, 178, 91), 0.05, 1, 0, 0.455, 0.3575))),
+    "daylight": dict(top=(255, 251, 245), bottom=(249, 243, 234), tile="linen", px=200,
+                     lights=(((255, 107, 44), 0.06, 0, 1, 0.54, 0.42),)),
+}
+FOIL = ((0, (169, 80, 42)), (0.18, (201, 104, 58)), (0.32, (226, 154, 104)), (0.42, (240, 180, 136)), (0.5, (255, 230, 202)),
+        (0.58, (240, 180, 136)), (0.68, (226, 154, 104)), (0.82, (201, 104, 58)), (1, (169, 80, 42)))
+RADIAL = 181                                   # Pillow's radial_gradient at the middle of an edge (255 is its corner)
+FOIL_PX, FOIL_EDGE = 600, 1.5                  # the copper band repeats; its bright point follows the pointer
+SPOT_REACH, SPOT_WASH, SPOT_RIM, SPOT_HI, SPOT_TEXT, SPOT_HEAT = 520, 330, 264, 165, 168, 150  # px radii (v5 spotlight)
+
 # Spotlight and shimmer. Themes in FX have their own light; the others use their accent when the setting says "all".
+# fill: wash on the card. rim, hi: the ring inside the edge, then white as an overlay. sheen: warm light on the text.
+# ig: the title's letters near the pointer (and in turn while speaking) flash the first colour, cool to the second.
 FX = {
-    "madefire": dict(fill=((246, 162, 86), 0.05), rim=((247, 138, 59), 0.75), hi=0.32,
-                     glows=(((255, 107, 44), 0.09), ((232, 71, 26), 0.07), ((194, 55, 15), 0.05), ((255, 107, 44), 0.05))),
-    "daylight": dict(fill=((184, 50, 12), 0.04), rim=((184, 50, 12), 0.6), hi=0.18,
-                     glows=(((184, 50, 12), 0.045), ((143, 42, 12), 0.038), ((194, 55, 15), 0.028), ((184, 50, 12), 0.028))),
+    "madefire": dict(fill=((246, 144, 85), 0.05), rim=((247, 128, 59), 0.75), hi=0.32, sheen=((255, 199, 143), "overlay"),
+                     ig=("#FFE7C2", "#FFB25B"), art=0.4,
+                     glows=(((255, 107, 44), 0.05), ((232, 71, 26), 0.04), ((194, 55, 15), 0.03), ((255, 178, 91), 0.02))),
+    "daylight": dict(fill=((255, 133, 51), 0.07), rim=((247, 128, 59), 0.6), hi=0.18, sheen=((203, 61, 11), "normal"),
+                     ig=("#E8471A", "#B8320C"), art=0.25, glows=()),
 }
 DRIFT = ((26, 0.22, 0.12, 0.28, 0.20), (38, 0.80, 0.30, -0.26, 0.24), (51, 0.35, 0.85, 0.30, -0.22),
          (44, 0.75, 0.80, -0.20, -0.26))  # per glow: period s, start x, start y, drift x, drift y (of the panel)
@@ -118,8 +137,28 @@ def fx_of(theme: str, setting: str):
     if setting == "off" or (setting != "all" and theme not in FX):
         return None
     a = ACC_RGB
-    return FX.get(theme) or dict(fill=(a, 0.05), rim=(a, 0.75), hi=0.32,
+    return FX.get(theme) or dict(fill=(a, 0.05), rim=(a, 0.75), hi=0.32, sheen=(_rgb(EMBER), "normal"), ig=(EMBER, EMBER), art=0.3,
                                  glows=((a, 0.07), (a, 0.05), (a, 0.04), (a, 0.04)))
+
+
+def sheen_on(fill: str, light: tuple, mode: str) -> str:
+    """A text colour fully under the spotlight: CSS overlay of the light on it, or the light itself."""
+    if mode != "overlay":
+        return "#%02x%02x%02x" % light
+    return "#%02x%02x%02x" % tuple(round(2 * b * v / 255 if b < 128 else 255 - 2 * (255 - b) * (255 - v) / 255)
+                                   for b, v in zip(_rgb(fill), light))
+
+
+IGNITE = 6.0  # seconds a title's cycle takes: each letter catches 55 ms after the one before, cools, then all rest
+
+
+def ignite(i: int, t: float, fg: str, ig: tuple):
+    """Letter i's colour at time t of the ignite cycle, or None while it rests."""
+    k = ((t - 0.4 - i * 0.055) % IGNITE) / IGNITE
+    if k >= 0.22:
+        return None
+    return (mix(fg, ig[0], k / 0.03) if k < 0.03 else mix(ig[0], ig[1], (k - 0.03) / 0.06) if k < 0.09
+            else mix(ig[1], fg, (k - 0.09) / 0.13))
 
 
 def drift_at(i: int, t: float) -> tuple:
@@ -310,7 +349,7 @@ class Art:
         return self._cache[key]
 
     def knob(self):
-        col, glow = ACC_HI[0], ACC_RGB
+        col, glow = LINE or ACC_HI[0], ACC_RGB
 
         def make():
             I, D, F = self.I, self.D, self.F
@@ -399,6 +438,9 @@ class Art:
             I, D, F, SS = self.I, self.D, self.F, self.SS
             n_w, n_h, r = w * SS, h * SS, self.p(10) * SS
             body = I.new("RGBA", (n_w, n_h), self._rgba(t["CARD"]))
+            name = next((n for n in SHEETS if THEMES[n] is t), None)
+            if name:
+                body = self.sheet(name, w, h).resize((n_w, n_h)).convert("RGBA")
             light = I.new("RGBA", (n_w, n_h), (0, 0, 0, 0))
             D.Draw(light).ellipse((n_w * 0.45, -n_h * 0.9, n_w * 1.4, n_h * 0.9), fill=(*t["GLOW_WARM"], 90))
             body.alpha_composite(light.filter(F.GaussianBlur(n_h / 3)))
@@ -473,7 +515,7 @@ class Art:
         key = ("falloff", r, round(peak, 3), power)
         if key not in self._cache:
             g = self.I.radial_gradient("L").resize((2 * r, 2 * r), self.I.BICUBIC)
-            self._cache[key] = g.point([round(255 * peak * (1 - v / 255) ** power) for v in range(256)])
+            self._cache[key] = g.point([round(255 * peak * max(0, 1 - v / RADIAL) ** power) for v in range(256)])
         return self._cache[key]
 
     def disc(self, r: int, rgb: tuple, peak: float, power: float = 1.6):
@@ -484,17 +526,63 @@ class Art:
             return im
         return self.get(("disc", r, rgb, round(peak, 3), power), make)
 
-    def rimlight(self, box: tuple, x: int, y: int, fx: dict, k: float):
-        """The spotlight on the rim, for the card area `box` with the pointer at x, y: flame, then white on top."""
-        I = self.I
-        r1, r2 = self.p(132), self.p(82)
-        area = lambda r: (box[0] - x + r, box[1] - y + r, box[2] - x + r, box[3] - y + r)
-        im = I.new("RGBA", (box[2] - box[0], box[3] - box[1]), (*fx["rim"][0], 0))
-        im.putalpha(self.falloff(r1, fx["rim"][1] * k, 1.2).crop(area(r1)))
-        top = I.new("RGBA", im.size, (255, 255, 255, 0))
-        top.putalpha(self.falloff(r2, fx["hi"] * k, 1.2).crop(area(r2)))
-        im.alpha_composite(top)
-        return im
+    def ring(self, base, x: int, y: int, fx: dict):
+        """The spotlight on the ring inside the edge, over `base` (RGB); the pointer is at x, y from its corner."""
+        I, (w, h) = self.I, base.size
+        r1, r2 = self.p(SPOT_RIM), self.p(SPOT_HI)
+        area = lambda r: (r - x, r - y, r - x + w, r - y + h)
+        im = I.composite(I.new("RGB", (w, h), fx["rim"][0]), base, self.falloff(r1, fx["rim"][1], 1).crop(area(r1)))
+        return I.composite(im.point(lambda v: min(255, 2 * v)), im, self.falloff(r2, fx["hi"], 1).crop(area(r2)))
+
+    def tile(self, name: str, px: int):
+        key = ("tile", name)
+        if key not in self._cache:
+            self._cache[key] = self.I.open(_HERE / "assets" / f"{name}.png").convert("RGBA").resize(
+                (self.p(px),) * 2, self.I.LANCZOS)
+        return self._cache[key]
+
+    def sheet(self, name: str, w: int, h: int):
+        """The whole card (RGB) for a theme in SHEETS."""
+        key = ("sheet", name, w, h)
+        if key not in self._cache:
+            for old in [k for k in self._cache if isinstance(k, tuple) and k[0] == "sheet"][:-5]:
+                del self._cache[old]
+            I, sh = self.I, SHEETS[name]
+            im = I.composite(I.new("RGB", (w, h), sh["bottom"]), I.new("RGB", (w, h), sh["top"]),
+                             I.linear_gradient("L").resize((w, h), I.BICUBIC))
+            for rgb, peak, cx, cy, rx, ry in sh["lights"]:
+                rx, ry = round(rx * w), round(ry * h)
+                g = I.radial_gradient("L").resize((2 * rx, 2 * ry), I.BICUBIC).point(
+                    [round(255 * peak * max(0, 1 - v / RADIAL)) for v in range(256)])
+                x, y = cx * w, cy * h
+                im.paste(rgb, (x - rx, y - ry), g)
+            try:
+                t, full = self.tile(sh["tile"], sh["px"]), I.new("RGBA", (w, h))
+                for ty in range(0, h, t.height):
+                    for tx in range(0, w, t.width):
+                        full.paste(t, (tx, ty))
+                im = (self.mul(im, full.convert("RGB")) if sh["tile"] == "linen" else
+                      I.alpha_composite(im.convert("RGBA"), full).convert("RGB"))
+            except OSError:  # no tile file: the plain fill
+                pass
+            self._cache[key] = im
+        return self._cache[key]
+
+    def foil(self, w: int, gx: float):
+        """The copper foil's colours along the top edge (w x 1 RGB), bright at gx."""
+        P = self.p(FOIL_PX)
+        if ("foil", w) not in self._cache:
+            row = self.I.new("RGB", (P, 1))
+            for x in range(P):
+                t = x / P
+                (a, ca), (b, cb) = next(q for q in zip(FOIL, FOIL[1:]) if t <= q[1][0])
+                row.putpixel((x, 0), tuple(round(m + (n - m) * (t - a) / (b - a)) for m, n in zip(ca, cb)))
+            strip = self.I.new("RGB", (w + 2 * P, 1))
+            for x in range(0, w + 2 * P, P):
+                strip.paste(row, (x, 0))
+            self._cache[("foil", w)] = strip
+        at = round(P / 2 - gx) % P
+        return self._cache[("foil", w)].crop((at, 0, at + w, 1))
 
     def glow_pil(self, w: int, h: int, kind: str, make=None):
         """The ambient light as a Pillow image (CornerGlass samples it)."""
@@ -558,25 +646,29 @@ class CornerGlass:
     def _render(self, r: int, edge: str, band, backdrop, light=None):
         key = (r, edge, band or backdrop[0], light and light[0])
         if key not in self._cache:
+            foil, ring, ew = light[1:] if light else (None, None, 1.0)
             if len(self._cache) > 300:   # the rim pulse makes a new colour every frame
                 self._cache.clear()
             I, D, SS = self.art.I, self.art.D, self.art.SS
             n, m = 2 * r * SS, 2 * r
             # the band is what the card shows there: a flat glow-ring colour, or the card under its ambient light
             col = I.new("RGB", (n, n), _rgb(band)) if band else backdrop[1].resize((n, n), I.NEAREST)
-            rim = I.new("L", (n, n), 0)
-            D.Draw(rim).ellipse((0, 0, n - 1, n - 1), fill=255)
-            D.Draw(rim).ellipse((SS, SS, n - 1 - SS, n - 1 - SS), fill=0)
-            col.paste(_rgb(edge), (0, 0, n, n), rim)
-            if light:  # the spotlight on the rim's curve
-                col.paste(light[1].convert("RGB").resize((n, n), I.NEAREST), (0, 0),
-                          self.art.mul(rim, light[1].getchannel("A").resize((n, n), I.NEAREST)))
+            def hoop(i, o):  # a ring from i to o px inside the curve
+                m_ = I.new("L", (n, n), 0)
+                i, o = round(i * SS), round(o * SS)
+                D.Draw(m_).ellipse((i, i, n - 1 - i, n - 1 - i), fill=255)
+                D.Draw(m_).ellipse((o, o, n - 1 - o, n - 1 - o), fill=0)
+                return m_
+            rim = hoop(0, ew)
+            col.paste(foil.resize((n, n), I.NEAREST) if foil else I.new("RGB", (n, n), _rgb(edge)), (0, 0), rim)
+            if ring:  # the spotlight, just inside the edge
+                col.paste(ring.resize((n, n), I.NEAREST), (0, 0), hoop(ew, ew + 1))
             a = I.new("L", (n, n), 0)
             da = D.Draw(a)
             da.ellipse((0, 0, n - 1, n - 1), fill=255)
             steps = 8
             for k in range(1, steps + 1):  # card band: solid to the inset curve, then fading out
-                i = int(round((self.INSET + 0.5 + self.FADE * k / steps) * SS))
+                i = int(round((max(self.INSET + 0.5, ew + 1 if light else 0) + self.FADE * k / steps) * SS))
                 if 2 * i < n - 2:
                     da.ellipse((i, i, n - 1 - i, n - 1 - i), fill=round(255 * (1 - k / steps)))
             col.putalpha(a)
@@ -1015,7 +1107,7 @@ class Widget:
         self._glass = None                  # CornerGlass (Windows), made on first show
         self._mini = None                   # MiniOrb while minimized
         self._use_glass = sys.platform == "win32"
-        root.bind("<Motion>", self._spot_motion, add="+")
+        root.bind("<Motion>", self._spot_kick, add="+")
         root.bind("<Configure>", lambda e: e.widget is root and self._glass and self._glass.sync(), add="+")
 
         self._build()
@@ -1062,6 +1154,10 @@ class Widget:
             "icon_orb": font(icon or dm, 14 if icon else 15), "link": font(dm_m, 12), "entry": font(dm, 13),
             "label": font(dm, 13),
         }
+        v5 = self.cfg.get("theme") in V5
+        self.F["eye"] = font(fam("VQ JetBrains Mono Tracked", mono), 9.5) if v5 else self.F["mono"]
+        if self.cfg.get("theme") == "daylight":
+            self.F["q"] = font(fam("VQ Fraunces Light", outfit), 17)
 
     def _rebuild(self):
         """Redraw everything at a new size (text size setting). Keeps position (right edge), mode and state."""
@@ -1361,9 +1457,13 @@ class Widget:
         self.card = c.create_rectangle(0, 0, Wp, self.h, fill=CARD, width=0, tags=("bg",))
         self.rim_top = c.create_line(0, 0, Wp, 0, fill=HAIR, tags=("bg",))
         self.glow_cap = c.create_image(0, 0, anchor="nw", image=self.art.glow(Wp, p(CAP_H), "cap"),
-                                       tags=("bg", "glowcap"), state="disabled")
+                                       tags=("bg", "glowcap"), state="hidden")
         self.glow_pan = c.create_image(0, 0, anchor="nw", image=self.art.glow(Wp, p(240), "pan"),
                                        tags=("bg", "glowpan"), state="hidden")
+        # the theme's textured card, over the hit areas, under everything else
+        self._sheet_name = self.cfg.get("theme") if self.cfg.get("theme") in SHEETS else None
+        self._sheet_key = None
+        self.sheet = c.create_image(0, 0, anchor="nw", tags=("bg",), state="hidden")
         self.rim_l = c.create_line(0, 0, 0, self.h, fill=HAIR, tags=("bg",))
         self.rim_r = c.create_line(Wp - 1, 0, Wp - 1, self.h, fill=HAIR, tags=("bg",))
         self.rim_b = c.create_line(0, self.h - 1, Wp, self.h - 1, fill=HAIR, tags=("bg",))
@@ -1388,7 +1488,7 @@ class Widget:
         self.cap_line = c.create_text(p(66), p(41), anchor="w", text="", font=self.F["line"], fill=MUTED,
                                       tags=("cap", "drag"))
         self.cap_track = c.create_line(p(66), p(55), p(200), p(55), fill=HAIR, width=max(1, p(2)), tags=("cap",))
-        self.cap_fill = c.create_line(p(66), p(55), p(66), p(55), fill=ACC[0], width=max(1, p(2)), tags=("cap",))
+        self.cap_fill = c.create_line(p(66), p(55), p(66), p(55), fill=LINE or ACC[0], width=max(1, p(2)), tags=("cap",))
         c.tag_bind("capname", "<Button-1>", lambda e: self._open(self._shown or self._call()))
         c.tag_bind("capname", "<Enter>", lambda e: (c.configure(cursor="hand2"), self._tint(self.cap_name, EMBER)))
         c.tag_bind("capname", "<Leave>", lambda e: (c.configure(cursor=""), self._tint(self.cap_name, FG)))
@@ -1428,7 +1528,7 @@ class Widget:
         c.tag_lower(self.bar_hit, self.glow_cap)
         self.bar_track = c.create_line(p(PAD), 0, Wp - p(PAD), 0, fill=HAIR, width=max(1, p(3)), capstyle="round",
                                        tags=("pan", "play", "bar"))
-        self.bar_fill = c.create_line(p(PAD), 0, p(PAD), 0, fill=ACC[0], width=max(1, p(3)), capstyle="round",
+        self.bar_fill = c.create_line(p(PAD), 0, p(PAD), 0, fill=LINE or ACC[0], width=max(1, p(3)), capstyle="round",
                                       tags=("pan", "play", "bar"))
         self.bar_tip = c.create_line(p(PAD), 0, p(PAD), 0, fill=EMBER, width=max(1, p(3)), capstyle="round",
                                      tags=("pan", "play", "bar"))
@@ -1452,14 +1552,14 @@ class Widget:
         self.next_t = c.create_text(0, 0, anchor="e", text="", font=self.F["meta"], fill=MUTED, tags=("pan", "play"))
 
         # calls waiting on you
-        self.call_rule = c.create_line(0, 0, 0, 0, fill=ACC[0], tags=("pan", "ask"))
+        self.call_rule = c.create_line(0, 0, 0, 0, fill=LINE or ACC[0], tags=("pan", "ask"))
         self.lane_rule = c.create_line(0, 0, 0, 0, fill=HAIR, tags=("pan",), state="hidden")  # Two lanes divider
         self.call_thread = c.create_text(0, 0, anchor="w", text="", font=self.F["meta"], fill=MUTED,
                                          tags=("pan", "ask", "callfrom"))
         self.call_hold = c.create_text(0, 0, anchor="e", text="● HELD", font=self.F["mono_s"], fill=EMBER,
                                        tags=("pan", "ask", "callhold"))
         self._tipify("callhold", lambda: "Held while you answer: new replies play but don't move this call")
-        self.call_eyebrow = c.create_text(0, 0, anchor="w", text="YOUR CALL", font=self.F["mono"], fill=EMBER,
+        self.call_eyebrow = c.create_text(0, 0, anchor="w", text="YOUR CALL", font=self.F["eye"], fill=EMBER,
                                           tags=("pan", "ask"))
         self.call_from = c.create_text(0, 0, anchor="w", text="", font=self.F["mono"], fill=MUTED,
                                        tags=("pan", "ask", "callfrom"))
@@ -1548,7 +1648,7 @@ class Widget:
         self._tipify("send", lambda: "Send to the session (Enter)")
 
         # library toggle + list
-        self.lib_t = c.create_text(p(PAD), 0, anchor="w", text="QUEUE & HISTORY", font=self.F["mono"], fill=MUTED,
+        self.lib_t = c.create_text(p(PAD), 0, anchor="w", text="QUEUE & HISTORY", font=self.F["eye"], fill=MUTED,
                                    tags=("pan", "libtoggle"))
         self.lib_g = c.create_text(0, 0, anchor="w", text=self.glyph("down"), font=self.F["icon_s"], fill=MUTED,
                                    tags=("pan", "libtoggle"))
@@ -1566,7 +1666,7 @@ class Widget:
                                                                       "units"))
         self.lst.bind("<Button-4>", lambda e: self.lst.yview_scroll(-3, "units"))
         self.lst.bind("<Button-5>", lambda e: self.lst.yview_scroll(3, "units"))
-        self.lst.configure(yscrollincrement=self.p(8))
+        self.lst.configure(yscrollincrement=self.p(8), yscrollcommand=self._list_sheet)
 
         # corner masks last: on top of everything, insensitive to the mouse
         self.corner = [c.create_image(0, 0, anchor="nw", state="disabled") for _ in range(4)]
@@ -1724,7 +1824,7 @@ class Widget:
         for item, img, xy in zip(self._ring_corner, imgs, ((0, 0), (w - s, 0), (0, h - s), (w - s, h - s))):
             c.coords(item, *xy)
             c.itemconfigure(item, image=img, state="disabled")
-        c.tag_raise("ring", self.glow_pan)
+        c.tag_raise("ring", self.sheet)
 
     def _set_height(self, h: int):
         h = max(self.p(CAP_H), int(h))
@@ -1735,6 +1835,7 @@ class Widget:
         if h > int(c.cget("height")):                # the canvas must cover the whole window
             c.configure(height=h + self.p(200))
         c.coords(self.card, 0, 0, Wp, h)
+        self._sheet_fit(h)
         c.coords(self.rim_l, 0, 0, 0, h)
         c.coords(self.rim_r, Wp - 1, 0, Wp - 1, h)
         c.coords(self.rim_b, 0, h - 1, Wp, h - 1)
@@ -1743,7 +1844,46 @@ class Widget:
             c.coords(self.corner[i], x, y)
         x, y = getattr(self, "_xy", (self.root.winfo_x(), self.root.winfo_y()))
         self.root.geometry(f"{Wp}x{h}+{x}+{y}")
+        if getattr(self, "_edge_items", None):
+            self._edge_draw()
         self._glass_shape()  # the bottom corners move over the ambient light
+
+    def _sheet_fit(self, h: int):
+        """Draw the sheet for the settled height; while the card grows or shrinks, the taller one shows."""
+        if not self._sheet_name:
+            return
+        th = max(h, self._target_h)
+        old = self._sheet_key
+        if old and (old[1] == th or (h != self._target_h and old[1] > th)):
+            return
+        self._sheet_key = (self.Wp, th)
+        self._sheet_pil = self.art.sheet(self._sheet_name, self.Wp, th)
+        self._sheet_img = self.art.TK.PhotoImage(self._sheet_pil)
+        self.c.itemconfigure(self.sheet, image=self._sheet_img, state="disabled")
+        self._list_sheet()
+
+    def _list_sheet(self, *_):
+        """The history list is its own canvas: give it the piece of the sheet it covers, still while it scrolls."""
+        if not self._sheet_name or not self._sheet_key:
+            return
+        l = self.lst
+        x, y = (int(v) for v in (self.c.coords(self.lst_win) or (0, 0)))
+        w, h = int(l.cget("width")), int(float(self.c.itemcget(self.lst_win, "height") or 0))
+        if h < 2:
+            return
+        key = (x, y, w, h, self._sheet_name, self._sheet_key)
+        if key != getattr(self, "_lst_key", None):
+            self._lst_key = key
+            self._lst_img = self.art.TK.PhotoImage(self._sheet_pil.crop((x, y, x + w, y + h)))
+        top = l.canvasy(0)
+        if l.find_withtag("sheet") and (l.itemcget("sheet", "image"), l.coords("sheet")[1]) == (str(self._lst_img), top):
+            return  # a redraw calls back here: touching the item again would never end
+        if not l.find_withtag("sheet"):
+            l.create_image(0, 0, anchor="nw", tags=("sheet",), state="disabled")
+        l.itemconfigure("sheet", image=self._lst_img)
+        l.coords("sheet", 0, top)
+        l.tag_lower("sheet")
+        l.tag_lower("rowbg", "sheet")
 
     def _set_shape(self, radius: int, edge: str):
         if (radius, edge) == (self._radius, self._edge):
@@ -1812,6 +1952,14 @@ class Widget:
         """(key, image): the card and its ambient light under the four corners, quadrants of a 2r square."""
         r, Wp, h, p = self._radius, self.Wp, self.h, self.p
         cap = self.mode == "cap"
+        if self._sheet_name and self._sheet_key:
+            key = ("sheet", r, h, self._sheet_key)
+            if getattr(self, "_bd", (None,))[0] != key:
+                img = self.art.I.new("RGB", (2 * r, 2 * r))
+                for (x, y), q in zip(((0, 0), (Wp - r, 0), (0, h - r), (Wp - r, h - r)), ((0, 0), (r, 0), (0, r), (r, r))):
+                    img.paste(self._sheet_pil.crop((x, y, x + r, y + r)), q)
+                self._bd = (key, img)
+            return self._bd
         gw, gh, kind = Wp, p(CAP_H) if cap else p(240), "cap" if cap else "pan"
         spots = ((0, 0), (Wp - r, 0), (0, h - r), (Wp - r, h - r))
         key = (kind, r, Wp, tuple(min(y, gh) for _, y in spots))
@@ -1834,32 +1982,36 @@ class Widget:
         if not self._glass or not self._radius:
             return
         band, bd = self._band(), self._backdrop()
-        light = self._corner_light()
+        light = self._corner_light(band, bd)
         key = (self._radius, self._edge, band or bd[0], light and light[0])
         if key != getattr(self, "_glass_key", None):
             self._glass_key = key
             self._glass.shape(self._radius, self._edge or HAIR, band, bd, light)
 
     # ---------------------------------------------------------- spotlight and shimmer
-    SPOT_IN, SPOT_OUT = 0.3, 0.45   # seconds
-
     def _fx_build(self):
-        """Light items over the card and its hit areas, under all content: drifting glows, the pointer's wash, its light on the rim."""
-        c = self.c
-        # a loop from before a rebuild keeps running and just finds the new items
-        self._fx_imgs = []
+        """Light over the card and its hit areas, under all content: drifting glows, the pointer's wash, the edge and its ring."""
+        c, n = self.c, dict(state="hidden", tags=("bg",))
+        self._fx_imgs, self._foil_key, self._foil_imgs = [], None, []
         self._fx = fx_of(self.cfg.get("theme"), self.cfg.get("spotlight"))
-        self._spot_k, self._spot_at = 0.0, None
-        self._drift_items, self._spot_fill, self._spot_rim = [], None, []
+        self._foil_on = self.cfg.get("theme") == "daylight"
+        self._spot_at, self._spot_key, self._spot_fill = None, None, None
+        self._drift_items, self._spot_rim, self._orb_lit = [], [], None
+        self._lit, self._lit_key, self._texts_seen, self._layouts, self._ghosts = [], None, {}, {}, {}
+        # a loop from before a rebuild keeps running and just finds the new items
+        self._edge_items = [c.create_image(0, 0, anchor="nw", state="disabled", tags=("bg", "edge")) for _ in range(4)] \
+            if self._foil_on else []
         if not self._fx:
             return
         for rgb, peak in self._fx["glows"]:
             self._drift_items.append(c.create_image(0, 0, image=self.art.disc(round(self.Wp * 0.42), rgb, peak),
                                                     state="disabled", tags=("bg",)))
-        self._spot_fill = c.create_image(0, 0, state="hidden", tags=("bg",))
-        self._spot_rim = [c.create_image(0, 0, anchor="nw", state="hidden", tags=("bg", "spotrim")) for _ in range(4)]
+        self._spot_fill = c.create_image(0, 0, **n)
+        self._spot_rim = [c.create_image(0, 0, anchor="nw", state="hidden", tags=("bg", "edge", "spotrim")) for _ in range(4)]
+        self._orb_lit = c.create_image(0, 0, state="hidden")
         self._drift_place(time.time())
         self._drift_kick()
+        self._spot_kick()
 
     def _drift_place(self, t: float):
         for i, item in enumerate(self._drift_items):
@@ -1878,70 +2030,275 @@ class Widget:
         self._drift_place(time.time())
         self._drift_kick()
 
-    def _spot_motion(self, e=None):
+    def _spot_kick(self, e=None):
         if self._fx and not getattr(self, "_spot_job", None):
-            self._spot_seen = time.perf_counter()
             self._spot_job = self.root.after(1, self._spot)
 
     def _spot(self):
-        """Follow the pointer at about 30 fps while it is over the player, then fade out and stop."""
+        """Follow the pointer, also outside the card (the light reaches in): 30 fps while it moves, slow otherwise."""
         self._spot_job = None
         if not self._fx:
             return
-        now = time.perf_counter()
-        dt, self._spot_seen = min(0.1, now - self._spot_seen), now
+        if not self._visible:
+            self._spot_draw(None)
+            self._text_light(None, None)
+            return  # _tick_once starts it again
         x, y = self.root.winfo_pointerx() - self.root.winfo_rootx(), self.root.winfo_pointery() - self.root.winfo_rooty()
-        inside = self._visible and 0 <= x < self.Wp and 0 <= y < self.h
-        k = min(1.0, self._spot_k + dt / self.SPOT_IN) if inside else max(0.0, self._spot_k - dt / self.SPOT_OUT)
-        at = (x, y) if inside else self._spot_at
-        steady = k == self._spot_k and at == self._spot_at
-        if at and not steady:
-            self._spot_draw(at, k)
-        if inside or k > 0:
-            self._spot_job = self.root.after(100 if steady else 33, self._spot)
+        d = max(-x, x - self.Wp, -y, y - self.h, 0)
+        at = (x, y) if d <= self.p(SPOT_REACH) else None
+        wave = self._wave()
+        moved = at != self._spot_at
+        if moved or at:
+            self._spot_draw(at)
+        if moved or at or wave is not None or self._lit_key:
+            self._text_light(at, wave)
+        self._spot_job = self.root.after(33 if moved or wave is not None else 100 if at else 150, self._spot)
 
-    def _spot_draw(self, at: tuple, k: float):
-        c, fx, (x, y) = self.c, self._fx, at
-        self._spot_at, self._spot_k = at, k
-        lvl = round(k * 10) / 10  # ten fade steps: the sprites are cached
-        if not lvl:
+    def _wave(self):
+        """Time in the title's ignite cycle while speaking (None at rest or with motion off)."""
+        if not self._cur or self._paused or self._reduced():
+            return None
+        t = time.time() % IGNITE
+        n = len(self.c.itemcget(self.cap_name if self.mode == "cap" else self.pan_name, "text"))
+        return t if t < 0.4 + n * 0.055 + 0.22 * IGNITE else None
+
+    def _spot_draw(self, at):
+        """Light for the pointer at `at` (card px, may lie outside), or None: too far away."""
+        self._spot_at = at
+        if not self._fx:
+            return
+        c, fx, art, w, h, r = self.c, self._fx, self.art, self.Wp, self.h, self._radius or 0
+        key = (at, w, h, r, self._edge, self._band(), self._sheet_key)
+        if key == self._spot_key:
+            return
+        self._spot_key = key
+        self._edge_draw()
+        if at is None:
             c.itemconfigure(self._spot_fill, state="hidden")
+            c.itemconfigure(self._orb_lit, state="hidden")
             c.itemconfigure("spotrim", state="hidden", image="")
             self._glass_shape()
             return
-        c.itemconfigure(self._spot_fill, image=self.art.disc(self.p(165), fx["fill"][0], fx["fill"][1] * lvl),
-                        state="disabled")
+        x, y = at
+        c.itemconfigure(self._spot_fill, image=art.disc(self.p(SPOT_WASH), *fx["fill"], 1), state="disabled")
         c.coords(self._spot_fill, x, y)
-        r, w, h, reach, imgs = self._radius or 0, self.Wp, self.h, self.p(132), []
-        c.tag_raise("spotrim", self.glow_pan)
-        for item, (x0, y0, x1, y1) in zip(self._spot_rim, ((r, 0, w - r, 1), (r, h - 1, w - r, h),
-                                                           (0, r, 1, h - r), (w - 1, r, w, h - r))):
-            x0, x1 = max(x0, x - reach), min(x1, x + reach)
-            y0, y1 = max(y0, y - reach), min(y1, y + reach)
+        e, reach, imgs = self._edge_px(), self.p(SPOT_RIM), []
+        ie = math.ceil(e)
+        for item, (x0, y0, x1, y1) in zip(self._spot_rim, ((r, ie, w - r, ie + 1), (r, h - ie - 1, w - r, h - ie),
+                                                           (ie, r, ie + 1, h - r), (w - ie - 1, r, w - ie, h - r))):
+            x0, x1, y0, y1 = max(x0, x - reach), min(x1, x + reach), max(y0, y - reach), min(y1, y + reach)
             if x0 >= x1 or y0 >= y1:
                 c.itemconfigure(item, state="hidden", image="")  # never keep a name Tk has dropped
                 continue
-            img = self.art.TK.PhotoImage(self.art.rimlight((x0, y0, x1, y1), x, y, fx, lvl))
+            img = art.TK.PhotoImage(art.ring(self._under((x0, y0, x1, y1)), x - x0, y - y0, fx))
             imgs.append(img)
             c.coords(item, x0, y0)
             c.itemconfigure(item, image=img, state="disabled")
         self._fx_imgs = imgs  # Tk keeps no reference of its own
+        self._orb_light(x, y)
         self._glass_shape()
 
-    def _corner_light(self):
-        """(key, RGBA quadrants of a 2r square): the spotlight on the corners' rim, or None when out of reach."""
-        k, at, r = round(getattr(self, "_spot_k", 0.0) * 10) / 10, getattr(self, "_spot_at", None), self._radius
-        if not k or not at or not self._fx:
-            return None
-        (x, y), w, h, reach = at, self.Wp, self.h, self.p(132)
-        out, near = None, []
-        for (cx, cy), q in zip(((0, 0), (w - r, 0), (0, h - r), (w - r, h - r)), ((0, 0), (r, 0), (0, r), (r, r))):
-            if max(cx - x, 0, x - cx - r) ** 2 + max(cy - y, 0, y - cy - r) ** 2 >= reach ** 2:
+    def _edge_px(self) -> float:
+        return FOIL_EDGE * self.S if self._foil_on else 1.0
+
+    def _under(self, box: tuple):
+        """What the card shows in `box` (RGB): the inner glow's colour while it pulses, or the sheet."""
+        band = self._band()
+        if self._sheet_name and self._sheet_key and not band:
+            return self._sheet_pil.crop(box)
+        return self.art.I.new("RGB", (box[2] - box[0], box[3] - box[1]), _rgb(band or CARD))
+
+    def _foil_x(self):
+        return self._spot_at[0] if self._spot_at and self._fx else -9999 * self.S  # the document's resting place
+
+    def _edge_draw(self):
+        """The copper foil edge: 1.5 px, bright where the pointer is."""
+        if not self._edge_items:
+            return
+        c, art, w, h, r, e = self.c, self.art, self.Wp, self.h, self._radius or 0, self._edge_px()
+        key = (round(self._foil_x()), w, h, r)
+        if key == getattr(self, "_foil_key", None) and self._foil_imgs:
+            return
+        self._foil_key = key
+        n, row = math.ceil(e), art.foil(w, self._foil_x())
+        imgs = []
+        for horizontal, flip, xy in ((True, False, (r, 0)), (True, True, (r, h - n)),
+                                     (False, False, (0, r)), (False, True, (w - n, r))):
+            size = (w - 2 * r, n) if horizontal else (n, h - 2 * r)
+            if min(size) < 1:
+                imgs.append("")
                 continue
-            out = out or self.art.I.new("RGBA", (2 * r, 2 * r), (0, 0, 0, 0))
-            out.paste(self.art.rimlight((cx, cy, cx + r, cy + r), x, y, self._fx, k), q)
-            near.append((cx - x, cy - y))
-        return ((k, tuple(near)), out) if out else None
+            im = (row.crop((r, 0, w - r, 1)) if horizontal else row.crop((xy[0], 0, xy[0] + n, 1))).resize(size, art.I.NEAREST)
+            cover = art.I.new("L", (1, n) if horizontal else (n, 1), 255)
+            if n > e:  # the last pixel is part covered
+                at = 0 if flip else n - 1
+                cover.putpixel((0, at) if horizontal else (at, 0), round(255 * (1 - n + e)))
+            im.putalpha(cover.resize(size, art.I.NEAREST))
+            imgs.append(art.TK.PhotoImage(im))
+            c.coords(self._edge_items[len(imgs) - 1], *xy)
+        for item, img in zip(self._edge_items, imgs):
+            c.itemconfigure(item, image=img)
+        self._foil_imgs = imgs
+
+    def _corner_light(self, band=None, bd=None):
+        """(key, foil, ring, edge px) for the four corners as quadrants of a 2r square, or None: a plain edge."""
+        r, at, art = self._radius, getattr(self, "_spot_at", None), self.art
+        if not getattr(self, "_fx", None):
+            at = None
+        if not at and not self._foil_on:
+            return None
+        w, h, reach = self.Wp, self.h, self.p(SPOT_RIM)
+        spots = list(zip(((0, 0), (w - r, 0), (0, h - r), (w - r, h - r)), ((0, 0), (r, 0), (0, r), (r, r))))
+        foil = ring = None
+        if self._foil_on:
+            foil, row = art.I.new("RGB", (2 * r, 2 * r)), art.foil(w, self._foil_x())
+            for (cx, _), q in spots:
+                foil.paste(row.crop((cx, 0, cx + r, 1)).resize((r, r), art.I.NEAREST), q)
+        near = [] if not at else [((cx, cy), q) for (cx, cy), q in spots if max(cx - at[0], 0, at[0] - cx - r) ** 2
+                                  + max(cy - at[1], 0, at[1] - cy - r) ** 2 < reach ** 2]
+        if near:
+            base = art.I.new("RGB", (2 * r, 2 * r), _rgb(band)) if band else (bd or self._backdrop())[1]
+            ring = base.copy()
+            for (cx, cy), q in near:
+                ring.paste(art.ring(base.crop((*q, q[0] + r, q[1] + r)), at[0] - cx, at[1] - cy, self._fx), q)
+        if not foil and not ring:
+            return None
+        return ((round(self._foil_x()) if foil else None, at if near else None, w, h), foil, ring, self._edge_px())
+
+    def _orb_light(self, x: int, y: int):
+        """The spotlight's warm blend on the orb."""
+        c, art, p = self.c, self.art, self.p
+        ox, oy = c.coords(self.orb) or (0, 0)
+        d, reach = p(ORB), p(216)
+        if c.itemcget(self.orb, "state") == "hidden" or (ox - x) ** 2 + (oy - y) ** 2 > (reach + d) ** 2:
+            c.itemconfigure(self._orb_lit, state="hidden")
+            return
+        x0, y0 = int(ox - d / 2), int(oy - d / 2)
+        if "orbmask" not in art._cache:
+            m = art.I.new("L", (d * 4, d * 4), 0)
+            art.D.Draw(m).ellipse((0, 0, d * 4 - 1, d * 4 - 1), fill=255)
+            art._cache["orbmask"] = m.resize((d, d), art.I.LANCZOS)
+        im = art.I.new("RGBA", (d, d), (255, 200, 140, 0))
+        im.putalpha(art.mul(art._cache["orbmask"], art.falloff(reach, self._fx["art"], 1).crop(
+            (x0 - x + reach, y0 - y + reach, x0 - x + reach + d, y0 - y + reach + d))))
+        self._orb_img = art.TK.PhotoImage(im)
+        c.coords(self._orb_lit, x0 + d / 2, y0 + d / 2)
+        c.itemconfigure(self._orb_lit, image=self._orb_img, state="disabled")
+        c.tag_raise(self._orb_lit, self.orb)
+
+    def _pieces(self, item, letters: bool):
+        """Where a text item's pieces (3 letters, or 1) are drawn: [(text, x, y, centre x, centre y)], None if unknown."""
+        c = self.c
+        text, width = c.itemcget(item, "text"), int(float(c.itemcget(item, "width") or 0))
+        fname, anchor, xy = c.itemcget(item, "font"), c.itemcget(item, "anchor"), tuple(c.coords(item))
+        key = (text, width, fname, anchor, xy, letters)
+        old = self._layouts.get(item)
+        if old and old[0] == key:
+            return old[1], old[2]
+        font = next((f for f in self.F.values() if str(f) == fname), None)
+        out = None
+        if font and text and len(xy) == 2:
+            lines = []
+            for para in text.split("\n"):
+                if not width or font.measure(para) <= width:
+                    lines.append(para)
+                    continue
+                cur = ""
+                for word in para.split(" "):  # as Tk wraps: at spaces
+                    if cur and font.measure(cur + " " + word) > width:
+                        lines.append(cur)
+                        cur = word
+                    else:
+                        cur = cur + " " + word if cur else word
+                lines.append(cur)
+            lh, bb = font.metrics("linespace"), c.bbox(item)
+            if bb and abs((bb[3] - bb[1]) - lh * len(lines)) <= 2:  # else Tk wrapped it another way: leave it
+                tw = max(font.measure(q) for q in lines)
+                left = xy[0] - (tw if anchor.endswith("e") else 0 if "w" in anchor else tw / 2)
+                out, n = [], 1 if letters else 3
+                for j, q in enumerate(lines):
+                    for i in range(0, len(q), n):
+                        bit = q[i:i + n]
+                        px, pw = left + font.measure(q[:i]), font.measure(bit)
+                        out.append((bit, px, bb[1] + j * lh, px + pw / 2, bb[1] + (j + 0.5) * lh, i))
+        self._layouts[item] = (key, out, font)
+        return out, font
+
+    def _text_light(self, at, wave):
+        """Warm sheen on the text near the pointer, and the title's letters on fire. A lit item waits just
+        under the opaque sheet (its clicks and size stay) while coloured pieces stand in: over it they look bold."""
+        c, fx, p = self.c, self._fx, self.p
+        if not (fx and self._sheet_name and self._sheet_key):
+            at = wave = None  # no sheet to hide the text behind
+        want = []
+        title = self.cap_name if self.mode == "cap" else self.pan_name
+        R, H = p(SPOT_TEXT), p(SPOT_HEAT)
+        found = set(c.find_overlapping(at[0] - R, at[1] - R, at[0] + R, at[1] + R)) if at else set()
+        if wave is not None:
+            found.add(title)
+        ghosts = set()
+        for item in sorted(found):
+            if item not in self._texts_seen:
+                self._texts_seen[item] = c.type(item) == "text" and "sheen" not in c.gettags(item)
+            if not self._texts_seen[item] or c.itemcget(item, "state") == "hidden":
+                continue
+            fill = c.itemcget(item, "fill")
+            if len(fill) != 7 or (fill in (ACC_INK, ORB_INK) and fill != FG):  # text on a filled button keeps its ink
+                continue
+            runs, lit = [], False
+            got, font = self._pieces(item, item == title)
+            for bit, x, y, cx, cy, i in got or ():
+                d = math.hypot(cx - at[0], cy - at[1]) if at else 1e9
+                col = None
+                if item == title:
+                    heat = round((1 - d / H) ** 1.4, 1) if d < H else 0
+                    col = ignite(i, wave, fill, fx["ig"]) if wave is not None else None
+                    if heat:
+                        col = mix(col or fill, mix(fx["ig"][1], fx["ig"][0], max(heat - 0.5, 0) * 2), min(heat * 2, 1))
+                elif d < R:
+                    k = round(0.55 * (1 - d / R), 2)
+                    if k >= 0.04:
+                        col = mix(fill, sheen_on(fill, *fx["sheen"]), k)
+                lit = lit or bool(col and col != fill)
+                col = col or fill
+                if runs and runs[-1][3] == col and runs[-1][2] == y:
+                    runs[-1][0] += bit
+                else:
+                    runs.append([bit, x, y, col])
+            if lit:
+                ghosts.add(item)
+                want += [(item, bit, round(x), round(y), str(font), col) for bit, x, y, col in runs if bit.strip()]
+        for item, mark in list(self._ghosts.items()):
+            if item not in ghosts:  # back to its place in the stack
+                if c.type(item):
+                    c.tag_raise(item, mark)
+                c.delete(mark)
+                del self._ghosts[item]
+        for item in ghosts - set(self._ghosts):
+            mark = self._ghosts[item] = c.create_line(-9, -9, -9, -9, state="hidden")  # keeps its place
+            c.tag_raise(mark, item)
+            c.tag_lower(item, self.sheet)
+        key = tuple(want) or None
+        if key == self._lit_key:
+            return
+        self._lit_key = key
+        while len(self._lit) < len(want):
+            self._lit.append([c.create_text(0, 0, anchor="nw", state="hidden", tags=("sheen",)), None])
+        for slot, w_ in zip(self._lit, want):
+            it, old = slot
+            if old != w_:
+                item, bit, x, y, font, col = w_
+                if old and old[:5] == w_[:5]:
+                    c.itemconfigure(it, fill=col)
+                else:
+                    c.coords(it, x, y)
+                    c.itemconfigure(it, text=bit, font=font, fill=col, state="disabled")
+                    c.tag_raise(it, self._ghosts[item])
+                slot[1] = w_
+        for slot in self._lit[len(want):]:
+            if slot[1]:
+                c.itemconfigure(slot[0], state="hidden")
+                slot[1] = None
 
     def _set_alpha(self, a: float):
         self.root.attributes("-alpha", a)
@@ -2183,7 +2540,7 @@ class Widget:
             c.itemconfigure("lib", state="hidden")
             c.itemconfigure("glowpan", state="hidden")
             c.itemconfigure("cap", state="normal")
-            c.itemconfigure("glowcap", state="disabled")
+            c.itemconfigure("glowcap", state="hidden" if self._sheet_name else "disabled")
         else:
             c.itemconfigure("cap", state="hidden")
             c.itemconfigure("glowcap", state="hidden")
@@ -2985,7 +3342,7 @@ class Widget:
             self.note.delete("1.0", "end")
             self.note.insert("1.0", d.get("note", ""))
             self._note_cid = cid
-        lbl = c.create_text(p(PAD), y, anchor="nw", text="ANYTHING ELSE?", font=self.F["mono"], fill=MUTED,
+        lbl = c.create_text(p(PAD), y, anchor="nw", text="ANYTHING ELSE?", font=self.F["eye"], fill=MUTED,
                             tags=("pan", "ask"))
         hint = c.create_text(Wp - p(PAD), y, anchor="ne", text="Ctrl+Enter sends", font=self.F["mono"], fill=FAINT,
                              tags=("pan", "ask"))
@@ -3168,6 +3525,8 @@ class Widget:
                     pass
         if self._drift_items and self._visible and not self._reduced():
             self._drift_kick()
+        if getattr(self, "_visible", False):
+            self._spot_kick()
         first = not hasattr(self, "_started")
         if first:
             self._started = True
@@ -3441,7 +3800,7 @@ class Widget:
             for it in (self.call_nav, self.call_prev, self.call_next, *self._nav_bg.values()):
                 c.itemconfigure(it, state=state(many))
             new = self._held_label()
-            nx0 = p(PAD) + p(28) + self.F["mono"].measure(eyebrow) + p(10)
+            nx0 = p(PAD) + p(28) + self.F["eye"].measure(eyebrow) + p(10)
             room_new = (px_ if many else right - self.F["mono"].measure("Dismiss")) - p(14 + 10) - nx0
             self._text(self.call_new, self._ellipsize(f"NEW · {new}", self.F["mono_s"], room_new) if new else "")
             c.coords(self.call_new, nx0, y)
@@ -3505,6 +3864,7 @@ class Widget:
                 c.coords(self.send_bg, Wp - p(PAD) - p(5) - p(16), y + p(21))
                 c.coords(self.send_g, Wp - p(PAD) - p(5) - p(16), y + p(21))
                 y += p(42) + p(4)
+            self._text_light(None, None)  # every text back in its place first
             c.tag_raise("ask")
         c.itemconfigure("ask", state=state(bool(call)))
         if call:
@@ -3532,7 +3892,7 @@ class Widget:
         y += p(16)
         ly = y + p(7)
         c.coords(self.lib_t, p(PAD), ly)
-        c.coords(self.lib_g, p(PAD) + self.F["mono"].measure("QUEUE & HISTORY") + p(6), ly + p(1))
+        c.coords(self.lib_g, p(PAD) + self.F["eye"].measure("QUEUE & HISTORY") + p(6), ly + p(1))
         self._set_lib_glyph()
         c.coords(self.lib_count, Wp - p(PAD), ly)
         today = sum(1 for r in self.vq.history.recent(150)
@@ -3547,6 +3907,7 @@ class Widget:
             h = max(p(120), min(p(LIST_MAX), hl, room))
             c.coords(self.lst_win, p(PAD), y)
             c.itemconfigure(self.lst_win, height=h, state="normal")
+            self._list_sheet()
             y += h
         else:
             c.itemconfigure(self.lst_win, state="hidden")
@@ -3556,7 +3917,7 @@ class Widget:
             c.tag_raise(b["tag"])
         for i in self.corner:
             c.tag_raise(i)
-        c.itemconfigure("glowpan", state="disabled")
+        c.itemconfigure("glowpan", state="hidden" if self._sheet_name else "disabled")
         self._place_buttons()
         c.itemconfigure(self.pan_arrow, state="normal" if show else "hidden")
         self._resize(y)
@@ -3646,8 +4007,8 @@ class Widget:
         y = p(PAD + ORB + 18)
 
         def eyebrow(text, y, link=None):
-            c.create_line(x0, y, x0 + p(20), y, fill=ACC[0], tags=("set",))
-            c.create_text(x0 + p(28), y, anchor="w", text=text, font=self.F["mono"], fill=EMBER, tags=("set",))
+            c.create_line(x0, y, x0 + p(20), y, fill=LINE or ACC[0], tags=("set",))
+            c.create_text(x0 + p(28), y, anchor="w", text=text, font=self.F["eye"], fill=EMBER, tags=("set",))
             if link:
                 label, fn = link
                 tag = f"setlink{text}"
@@ -3670,11 +4031,11 @@ class Widget:
             c.tag_lower(c.create_rectangle(x0, ty - p(14), x1, ty + p(14), fill=CARD, width=0, tags=("set", "sethit", tag)),
                         self.glow_cap)  # hit area under the (mouse-transparent) ambient light
             c.create_line(a, ty, b, ty, fill=HAIR, width=max(1, p(3)), capstyle="round", tags=("set", tag))
-            fill = c.create_line(a, ty, xs[ix], ty, fill=ACC[0], width=max(1, p(3)), capstyle="round",
+            fill = c.create_line(a, ty, xs[ix], ty, fill=LINE or ACC[0], width=max(1, p(3)), capstyle="round",
                                  tags=("set", tag))
             dots = []
             for i, x in enumerate(xs):
-                d = c.create_image(x, ty, image=self.art.circle(7, fill=Art._rgba(ACC[0] if i <= ix else HAIR)),
+                d = c.create_image(x, ty, image=self.art.circle(7, fill=Art._rgba((LINE or ACC[0]) if i <= ix else HAIR)),
                                    tags=("set", tag))
                 dots.append(d)
                 c.create_text(x, ty + p(18), text=self._short(key, stops[i]), font=self.F["mono_s"],
@@ -3826,9 +4187,9 @@ class Widget:
         y = toggle("pulse_with_voice", "Pulse with the voice", "Off: a slow, steady breath while speaking", y)
         y = choice("spotlight", "Spotlight & shimmer",
                    [("madefire", "MadeFire themes"), ("all", "All themes"), ("off", "Off")],
-                   {"madefire": "A light follows the pointer, and faint glows drift, on MadeFire and Daylight",
-                    "all": "A light follows the pointer, and faint glows drift, in every theme",
-                    "off": "No pointer light and no drifting glows"}, y)
+                   {"madefire": "A light follows the pointer over edges and text; titles catch fire",
+                    "all": "The same light and shimmer in every theme, in its own colour; text glows in the MadeFire themes",
+                    "off": "No pointer light and no shimmer"}, y)
         y = toggle("reduce_motion", "Reduce motion", "Panels change at once; fades stay", y)
         y += p(14)
 
@@ -3891,6 +4252,7 @@ class Widget:
             c.tag_bind(tag, "<Leave>", lambda e, t=t: (self._tint(t, EMBER), c.configure(cursor="")))
         y = self._made_by(fy + p(22))
         y += p(R_PANEL)
+        self._text_light(None, None)  # every text back in its place first
         c.tag_raise("set")
         c.tag_lower("sethit", self.glow_cap)  # hit areas stay under the ambient light
         y = self._set_scroll_setup(y)
@@ -3899,7 +4261,7 @@ class Widget:
             c.tag_raise(b["tag"])
         for i in self.corner:
             c.tag_raise(i)
-        c.itemconfigure("glowpan", state="disabled")
+        c.itemconfigure("glowpan", state="hidden" if self._sheet_name else "disabled")
         self._place_buttons()
         self._fill(self.btn["gear"]["g"], self._btn_color("gear"))
         self._resize(y)
@@ -3956,15 +4318,21 @@ class Widget:
         off, self._set_off = min(self._set_off, self._set_max), 0
         # header: the card and its ambient light, cropped to the header band
         c.create_rectangle(0, 0, Wp, top, fill=CARD, width=0, tags=("setmask", "bg"))
+        if self._sheet_name:
+            pil = self.art.sheet(self._sheet_name, Wp, room)
+            self._mask_imgs = [self.art.TK.PhotoImage(pil.crop(b)) for b in ((0, 0, Wp, top), (0, bot, Wp, room))]
         src = self.art.glow(Wp, p(240), "pan")
         key = ("glowtop", Wp, top, str(src))
         if key not in self.art._cache:
             im = self.tk.PhotoImage(width=Wp, height=top)
             im.tk.call(im, "copy", str(src), "-from", 0, 0, Wp, top, "-to", 0, 0)
             self.art._cache[key] = im
-        c.create_image(0, 0, anchor="nw", image=self.art._cache[key], tags=("setmask", "bg"))
+        c.create_image(0, 0, anchor="nw", image=self._mask_imgs[0] if self._sheet_name else self.art._cache[key],
+                       tags=("setmask", "bg"), state="disabled")
         c.create_line(p(PAD), top - 1, Wp - p(PAD), top - 1, fill=HAIR, tags=("setmask", "setedge"))
         c.create_rectangle(0, bot, Wp, room, fill=CARD, width=0, tags=("setmask", "bg"))
+        if self._sheet_name:
+            c.create_image(0, bot, anchor="nw", image=self._mask_imgs[1], tags=("setmask", "bg"), state="disabled")
         c.create_line(p(PAD), bot, Wp - p(PAD), bot, fill=HAIR, tags=("setmask", "setedge"))
         self._set_bar = c.create_line(0, 0, 0, 0, fill=MUTED, width=max(2, p(3)), capstyle="round",
                                       tags=("setmask",), state="hidden")
@@ -3972,6 +4340,9 @@ class Widget:
         for it in (self.pan_name, self.pan_meta, self.rim_l, self.rim_r, self.rim_b, self.rim_top):
             c.tag_raise(it)
         c.tag_raise("ring")
+        c.tag_raise("edge")
+        for i in self.corner:
+            c.tag_raise(i)
         self._set_scroll(off)
         return room
 
@@ -4051,7 +4422,7 @@ class Widget:
         c.coords(sl["fill"], sl["a"], (sl["ty"] - self._set_off), kx, (sl["ty"] - self._set_off))
         c.itemconfigure(sl["vt"], text=sl["names"][ix])
         for i, d in enumerate(sl["dots"]):
-            c.itemconfigure(d, image=self.art.circle(7, fill=Art._rgba(ACC[0] if xs[i] <= kx + 1 else HAIR)))
+            c.itemconfigure(d, image=self.art.circle(7, fill=Art._rgba((LINE or ACC[0]) if xs[i] <= kx + 1 else HAIR)))
         sl["ix"] = ix
 
     def _slide_end(self, key):
@@ -4149,7 +4520,7 @@ class Widget:
         l, p = self.lst, self.p
         tag = f"r{it['id']}"
         h = p(48)
-        rect = l.create_rectangle(0, y, w, y + h, fill=CARD, width=0, tags=(tag,))
+        rect = l.create_rectangle(0, y, w, y + h, fill=CARD, width=0, tags=(tag, "rowbg"))
         if kind == "history":
             l.create_text(p(8), y + p(16), anchor="w", text=when(it["ts"]), font=self.F["mono_s"], fill=FAINT,
                           tags=(tag,))
@@ -4183,11 +4554,13 @@ class Widget:
         snip = self._ellipsize(it.get("text", ""), self.F["snip"], w - nx - p(32))
         l.create_text(nx, y + p(34), anchor="w", text=snip, font=self.F["snip"], fill=MUTED, tags=(tag,))
         act = l.create_text(w - p(14), y + h / 2, text=self.glyph("play" if kind == "history" else "close"),
-                            font=self.F["icon_s"], fill=CARD, tags=(tag, "act"))
+                            font=self.F["icon_s"], fill="" if self._sheet_name else CARD, tags=(tag, "act"))
 
         def hover(on):
             l.itemconfigure(rect, fill=HOVER if on else CARD)
-            l.itemconfigure(act, fill=FG if on else CARD)
+            if self._sheet_name and l.find_withtag("sheet"):  # at rest it lies under the (mouse-transparent) sheet
+                l.tag_raise(rect, "sheet") if on else l.tag_lower(rect)
+            l.itemconfigure(act, fill=FG if on else "" if self._sheet_name else CARD)
             l.configure(cursor="hand2" if on else "")
 
         def click(_e):
