@@ -894,6 +894,9 @@ class VoiceQueue:
              "question": (item.get("decision") or {}).get("question", ""), "answer": text, "at": time.time(),
              "row": item["id"]}
         with self._ans_cv:
+            for x in self._answers:  # a newer pick never shares its time with the one it replaces
+                if x["id"] == cid:
+                    a["at"] = max(a["at"], x["at"] + 0.01)
             self._answers = [x for x in self._answers if x["id"] != cid] + [a]  # a newer pick replaces it
             self._save_answers()
             self._ans_cv.notify_all()
