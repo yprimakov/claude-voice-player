@@ -500,6 +500,42 @@ class ThemeTests(unittest.TestCase):
         self.st.update(theme="ember")
         w._rebuild()
 
+    def test_spotlight_and_shimmer(self):
+        w, st = self.w, self.st
+        try:
+            for theme, setting, on in (("madefire", "madefire", True), ("daylight", "madefire", True),
+                                       ("ember", "madefire", False), ("ember", "all", True), ("madefire", "off", False)):
+                st.update(theme=theme, spotlight=setting)
+                w._rebuild()
+                self.assertEqual(bool(w._fx), on, (theme, setting))
+                self.assertEqual(len(w._drift_items), 4 if on else 0)
+            st.update(theme="madefire", spotlight="madefire")
+            w._rebuild()
+            w._set_mode("panel")
+            self.pump()
+            w._spot_draw((w.Wp - 3, 3), 1.0)  # at a corner: the rim and the corner's curve light up
+            self.assertEqual(w.c.itemcget(w._spot_fill, "state"), "disabled")
+            self.assertIsNotNone(w._corner_light())
+            w._spot_draw((w.Wp // 2, 1), 1.0)  # mid top edge: only the top strip
+            self.assertEqual([w.c.itemcget(i, "state") for i in w._spot_rim][:2], ["disabled", "hidden"])
+            w._spot_draw((w.Wp // 2, 1), 0.0)
+            self.assertEqual(w.c.itemcget(w._spot_fill, "state"), "hidden")
+            self.assertIsNone(w._corner_light())
+            before = [w.c.coords(i) for i in w._drift_items]
+            w._drift_place(0.0)
+            first = [w.c.coords(i) for i in w._drift_items]
+            w._drift_place(20.0)
+            self.assertNotEqual(first, [w.c.coords(i) for i in w._drift_items])
+            st.update(reduce_motion=True)  # drifting stops, the pointer light stays
+            w._drift_job = None
+            w._drift()
+            self.assertIsNone(w._drift_job)
+            self.assertTrue(w._fx)
+            self.assertEqual(len(before), 4)
+        finally:
+            st.update(theme="ember", spotlight="madefire", reduce_motion=False)
+            w._rebuild()
+
     def test_theme_colours_are_readable(self):
         for name, t in player.THEMES.items():
             with self.subTest(theme=name):
