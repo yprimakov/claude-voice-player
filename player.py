@@ -28,6 +28,14 @@ from pathlib import Path
 from voiced import (SKIPPED, active_sessions, answers_with_note, call_decisions, combined_answer, decisions_of,
                     thread_title)
 
+
+def sent_label(call: dict) -> str:
+    """How far a picked answer got: queued for the watcher, passed on, or only copied ('' = nothing picked)."""
+    if call.get("sent_answer"):
+        return "DELIVERED TO PROJECT" if call.get("relayed_at") else "WAITING FOR RELAY"
+    return "COPIED: PASTE IT THERE" if call.get("copied_answer") else ""
+
+
 _HERE = Path(__file__).resolve().parent
 
 KEY = "#020203"  # window transparency key: never used for anything drawn
@@ -2189,7 +2197,8 @@ class Widget:
             if r.get("kind") == "approve":
                 key = "approve:" + r["id"]
             elif r.get("kind") == "project":
-                key = "thread:" + (r.get("thread_id") or r["id"])
+                # an answer on its way keeps its own card, until the thread reports DONE
+                key = "sent:" + r["id"] if r.get("sent_answer") else "thread:" + (r.get("thread_id") or r["id"])
             else:
                 key = "session:" + (r.get("session_id") or r["id"])
             groups.setdefault(key, []).append(r)
@@ -2397,7 +2406,8 @@ class Widget:
         if not call:
             return None
         _, d = self._draft(call)
-        return d["ix"], tuple(d["answers"]), tuple(d["done"]), d.get("ctx", False), d.get("full", False)
+        return d["ix"], tuple(d["answers"]), tuple(d["done"]), d.get("ctx", False), d.get("full", False), \
+            call.get("sent_answer"), call.get("relayed_at"), call.get("copied_answer")
 
     def _reply(self, call, text):
         """Record one answer (None = skip). One question sends at once; several wait for Send answers."""
@@ -2410,10 +2420,10 @@ class Widget:
                     self.api.log(f"answer push: {e!r}")
                     sent = None
                 if sent:
-                    call["sent_answer"] = text
+                    call["sent_answer"], call["relayed_at"] = text, None
                     self._release()
                     self._layout_key = None
-                    self._toast(f"Sent to {call.get('thread') or call.get('project')}: {text}")
+                    self._toast(f"Waiting for relay to {call.get('thread') or call.get('project')}: {text}")
                     self._tick_once(force=True)
                     return
                 self._copy(text)  # no way back: copy it and open the app
@@ -2454,7 +2464,6 @@ class Widget:
             try:
                 if self.vq.answer_push(row, ans):
                     sent += 1
-                    self.answered.add(row["id"])
             except Exception as e:
                 self.api.log(f"answer push: {e!r}")
         self._toast(f"Sent {sent} answer{'s' if sent != 1 else ''} to {call.get('thread') or call.get('project')}"
@@ -2838,17 +2847,20 @@ class Widget:
         if item.get("kind") == "project":  # a cloud thread's group: one answer back per pushed call
             self._answer_pushes(item, answers or [text])
             return
-        for i in item.get("group_ids") or [cid]:  # the whole group closes: one message answered all of it
-            self.answered.add(i)
-            self.vq.history.update(i, answer=text, answered_at=time.time(),
-                                   **({"answers": answers} if answers else {}))
         if item.get("via_thread") or item.get("project_session"):  # a Claude Project's session: answered in
-            # its project thread (or, with no thread link, where the session is open), never typed in behind it
+            # its project thread (or, with no thread link, where the session is open), never typed in behind it.
+            # Copied is not sent: the call stays open until the answer shows up there.
+            for i in item.get("group_ids") or [cid]:
+                self.vq.history.update(i, copied_answer=text)
             self._copy(text)
             self.api.open_session(item)
             self._toast("Copied. Paste it in the project thread" if item.get("url") else "Copied. Paste it in the session")
             self._after_call()
             return
+        for i in item.get("group_ids") or [cid]:  # the whole group closes: one message answered all of it
+            self.answered.add(i)
+            self.vq.history.update(i, answer=text, answered_at=time.time(),
+                                   **({"answers": answers} if answers else {}))
         mode = self.cfg.get("desktop_answers")
         app_id = getattr(self.api, "desktop_app_id", None)
         if mode in ("send", "paste") and app_id and app_id(item):
@@ -2881,7 +2893,7 @@ class Widget:
         while self._typed:
             item, text, code = self._typed.pop(0)
             self._toast(self.api.desktop_result.get(code, "Answer copied"))
-            if code in (3, 4, 5):  # not delivered: keep the answer on the clipboard and the call open
+            if code in (3, 4, 5, 6):  # not delivered: keep the answer on the clipboard and the call open
                 self._copy(text)
                 for i in item.get("group_ids") or [self._call_id(item)]:
                     self.answered.discard(i)
@@ -3214,7 +3226,7 @@ class Widget:
             band_top = y - p(16)
             c.coords(self.call_rule, p(PAD), y, p(PAD) + p(20), y)
             c.coords(self.call_eyebrow, p(PAD) + p(28), y)
-            eyebrow = ("SENT · WAITING" if call.get("sent_answer") else "APP CALL") if call.get("kind") == "project" \
+            eyebrow = sent_label(call) or "APP CALL" if call.get("kind") == "project" or sent_label(call) \
                 else (f"YOUR CALLS · {len(self._calls)}" if lanes else "YOUR CALL")  # from a cloud Project thread
             self._text(self.call_eyebrow, eyebrow)
             # fixed slots from the right edge: Dismiss, next, counter, prev. Nothing here depends on the text.
@@ -3288,7 +3300,8 @@ class Widget:
                 bb = c.bbox(self.question)
                 y = (bb[3] if bb else y) + p(10)
                 y = self._call_context(call, dec, d, y)
-                y = self._call_chips(call, dec, d["answers"][ix] if d["done"][ix] else None, y)
+                y = self._call_chips(call, dec, d["answers"][ix] if d["done"][ix] else
+                                     call.get("sent_answer") or call.get("copied_answer"), y)
                 self._set_hint("Type your answer" if not dec["options"] else
                                ("Another answer, or ask a follow-up" if n > 1 else "Another option, or ask a follow-up"))
                 c.itemconfigure(self.entry_bg, image=self._entry_img(self.root.focus_get() is self.entry))

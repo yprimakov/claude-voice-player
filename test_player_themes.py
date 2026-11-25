@@ -420,15 +420,44 @@ class ThemeTests(unittest.TestCase):
             self.assertEqual(len(calls), 1)
             self.assertEqual([d["question"] for d in calls[0]["decisions"]], ["Install the job?", "Use my email?"])
             w._answer(calls[0], "x", answers=["install it", "not yet"])
+            cards = [c for c in w._collect_calls_raw(None) if c.get("thread_id") == "cmsg_threadroot01"]
+            self.assertEqual({c["sent_answer"] for c in cards}, {"install it", "not yet"})  # kept until DONE
+            self.assertEqual({player.sent_label(c) for c in cards}, {"WAITING FOR RELAY"})
             got = {}
             for _ in range(2):
                 x = w.vq.next_answer(0)
                 got[x["id"]] = x["answer"]
                 w.vq.ack_answer(x["id"])
             self.assertEqual(got, {"cg-1": "install it", "cg-2": "not yet"})  # one answer per pushed call
+            cards = [c for c in w._collect_calls_raw(None) if c.get("thread_id") == "cmsg_threadroot01"]
+            self.assertEqual({player.sent_label(c) for c in cards}, {"DELIVERED TO PROJECT"})
         finally:
             for cid in ("cg-1", "cg-2"):
                 w.vq.push_done(cid)
+
+    def test_undelivered_answers_stay_open(self):
+        w, h = self.w, self.w.vq.history
+        copy, opened = w._copy, []
+        w._copy = opened.append  # never the real clipboard
+        row = {"cwd": "C:/x/demo", "project": "demo", "entrypoint": "claude-desktop", "status": "spoken", "text": "q",
+               "ts": time.time(), "decision": {"question": "Pick?", "options": ["One", "Two"], "recommended": 0}}
+        try:
+            h.add({**row, "id": "ps1", "session_id": "s-ps", "project_session": True, "via_thread": True})
+            w._answer(next(c for c in w._collect_calls_raw(None) if c["id"] == "ps1"), "Two")
+            c = next(c for c in w._collect_calls_raw(None) if c["id"] == "ps1")  # copied is not sent
+            self.assertEqual((c["copied_answer"], player.sent_label(c)), ("Two", "COPIED: PASTE IT THERE"))
+            h.add({**row, "id": "ty1", "session_id": "s-ty"})
+            c = next(c for c in w._collect_calls_raw(None) if c["id"] == "ty1")
+            w.answered.add("ty1")
+            h.update("ty1", answer="Two", answered_at=time.time())
+            w._typed.append((c, "Two", 6))  # pasted, but Enter did not send it
+            w._typed_results()
+            self.assertTrue(any(c["id"] == "ty1" for c in w._collect_calls_raw(None)))
+            self.assertEqual(opened, ["Two", "Two"])
+        finally:
+            w._copy = copy
+            for i in ("ps1", "ty1"):
+                h.update(i, dismissed=True)
 
     def test_bundled_fonts_present_and_fallback(self):
         fonts = Path(player.__file__).with_name("fonts")

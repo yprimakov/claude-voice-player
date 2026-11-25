@@ -416,6 +416,38 @@ class AnswerPathTests(unittest.TestCase):
             srv.shutdown()
             vq.stop()
 
+    def test_answer_delivery_states(self):
+        vq = voiced.VoiceQueue(voiced.History(Path(tempfile.mkdtemp()) / "h.jsonl"), fake_synth, FakePlayer)
+        vq.muted = True
+        long = "A non-recommended choice " * 4
+        it = vq.push_call("c2", "Sample Project", "Sample thread", "Which?", ["First (recommended)", long])
+        self.assertEqual(it["decision"]["options"][1], long.strip())     # the exact label, not cut at 60
+        first = vq.answer_push(it, "First (recommended)")
+        self.assertEqual(vq.answer_push(it, "First (recommended)")["at"], first["at"])  # repeat clicks: one answer
+        seen = vq.next_answer(0)
+        vq.answer_push(it, long + "\n\nAlso: more")                      # a new pick before the relay is confirmed
+        self.assertFalse(vq.ack_answer("c2", seen["at"]))                 # the old ack must not drop the new pick
+        a = vq.next_answer(0)
+        self.assertEqual(a["answer"], long.strip() + "\n\nAlso: more")
+        self.assertFalse(vq.history.get(it["id"]).get("relayed_at"))
+        self.assertTrue(vq.ack_answer("c2", a["at"]))
+        self.assertTrue(vq.history.get(it["id"])["relayed_at"])
+        self.assertIsNone(vq.next_answer(0))
+        vq.stop()
+
+    @unittest.skipUnless(os.name == "nt", "Claude app files are Windows only")
+    def test_app_thread_found_for_waiting_and_resumed_calls(self):
+        root = Path(tempfile.mkdtemp())
+        (root / "a" / "b").mkdir(parents=True)
+        f = root / "a" / "b" / "local_resumed.json"
+        old, new = "11111111-0f5c-47a9-8666-0123456789ab", "22222222-0f5c-47a9-8666-0123456789ab"
+        f.write_text(json.dumps({"cliSessionId": old}), encoding="utf-8")
+        self.assertEqual(voiced.desktop_session_id(old, root), "local_resumed")
+        f.write_text(json.dumps({"cliSessionId": new}), encoding="utf-8")
+        self.assertEqual(voiced.desktop_session_id(new, root), "local_resumed")  # the same thread, resumed
+        self.assertEqual(voiced.desktop_app_id({"host": {}, "session_id": new}), "local_resumed")  # found waiting
+        self.assertEqual(voiced.desktop_app_id({"host": {"kind": "terminal"}, "session_id": new}), "")
+
 
 class WatchAnswersTests(unittest.TestCase):
     def test_multi_question_call_answered_in_thread_closes(self):

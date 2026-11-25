@@ -843,7 +843,7 @@ class VoiceQueue:
         url = str(url or "").strip()
         if not re.match(r"^(https://claude\.ai/|claude://)", url):
             url = project_link(cid, project_id, thread_id)  # only links into Claude are opened
-        opts = [" ".join(str(o).split())[:60] for o in (options if isinstance(options, list) else []) if str(o).strip()][:4]
+        opts = [" ".join(str(o).split())[:200] for o in (options if isinstance(options, list) else []) if str(o).strip()][:4]
         proj = " ".join(str(project or "Claude project").split())[:60]
         dec = {"question": question[:1].upper() + question[1:], "options": opts or ["Open"],
                "context": "From a Claude app Project thread. Answer it there: each option opens the thread.",
@@ -882,16 +882,22 @@ class VoiceQueue:
     def answer_push(self, item: dict, text: str) -> dict | None:
         """The user picked an option (or typed) on a pushed call: queue it for the thread. The call stays open,
         marked as sent, until the thread reports DONE."""
-        cid, text = item.get("push_id") or "", " ".join(str(text or "").split())[:2000]
+        cid = item.get("push_id") or ""
+        text = "\n".join(" ".join(x.split()) for x in str(text or "").strip().splitlines())[:2000]
         if not cid or not text:
             return None
+        with self._ans_cv:  # the same click again while it waits: nothing new to send
+            same = next((x for x in self._answers if x["id"] == cid and x["answer"] == text), None)
+        if same:
+            return dict(same)
         a = {"id": cid, "project": item.get("project") or "", "thread": item.get("thread") or "",
-             "question": (item.get("decision") or {}).get("question", ""), "answer": text, "at": time.time()}
+             "question": (item.get("decision") or {}).get("question", ""), "answer": text, "at": time.time(),
+             "row": item["id"]}
         with self._ans_cv:
             self._answers = [x for x in self._answers if x["id"] != cid] + [a]  # a newer pick replaces it
             self._save_answers()
             self._ans_cv.notify_all()
-        self.history.update(item["id"], sent_answer=text, sent_at=a["at"])
+        self.history.update(item["id"], sent_answer=text, sent_at=a["at"], relayed_at=None)
         log(f"call {item['id']} ({a['project']}) answer queued for its thread")
         return a
 
@@ -906,12 +912,17 @@ class VoiceQueue:
                 self._ans_cv.wait(min(left, 5))
             return dict(self._answers[0]) if self._answers else None
 
-    def ack_answer(self, cid: str) -> bool:
+    def ack_answer(self, cid: str, at: float | None = None) -> bool:
+        """The watcher passed this answer on. With `at` (the answer's own time), a newer pick made meanwhile stays."""
         with self._ans_cv:
-            n = len(self._answers)
-            self._answers = [x for x in self._answers if x["id"] != cid]
+            hit = [x for x in self._answers if x["id"] == cid and (at is None or abs(x["at"] - at) < 0.001)]
+            self._answers = [x for x in self._answers if x not in hit]
             self._save_answers()
-            return len(self._answers) < n
+        for x in hit:
+            if x.get("row"):
+                self.history.update(x["row"], relayed_at=time.time())
+            log(f"call {x.get('row') or x['id']} ({x.get('project')}) answer relayed")
+        return bool(hit)
 
     def push_done(self, cid: str) -> bool:
         """The thread saw the answer: close its pushed call."""
@@ -1314,7 +1325,11 @@ def make_server(vq: VoiceQueue | None, port: int = PORT) -> ThreadingHTTPServer:
             m = re.fullmatch(r"/calls/answers/([^/]{1,120})/ack", self.path)
             if m:
                 from urllib.parse import unquote
-                return self._json(200, {"ok": vq.ack_answer(unquote(m.group(1)))})
+                try:
+                    at = float(d["at"]) if d.get("at") is not None else None
+                except (TypeError, ValueError):
+                    return self._json(400, {"error": "at must be a number"})
+                return self._json(200, {"ok": vq.ack_answer(unquote(m.group(1)), at)})
             m = re.fullmatch(r"/calls/push/([^/]{1,120})/done", self.path)
             if m:  # a pushed call's thread saw the answer
                 from urllib.parse import unquote
@@ -1418,14 +1433,12 @@ def desktop_session_id(cli_sid: str, root: Path | None = None) -> str:
     except OSError:
         files = []
     for f in files:
-        if f.stem in _DESKTOP_IDS.values():
-            continue
         try:
             with f.open("rb") as fh:
                 m = _CLI_ID.search(fh.read(600))
         except OSError:
             continue
-        if m:
+        if m:  # files seen before are read again: an app thread gets a new CLI id when it is resumed
             _DESKTOP_IDS[m.group(1).decode()] = f.stem
             _DESKTOP_FILES[f.stem] = f
             if m.group(1).decode() == cli_sid:
@@ -1847,8 +1860,9 @@ DESKTOP_RESULT = {
 
 
 def desktop_app_id(item: dict) -> str:
-    """The Claude app's id for a reply that came from a thread open in the app, else ''."""
-    if sys.platform != "win32" or (item.get("host") or {}).get("kind") != "desktop":
+    """The Claude app's id for a reply that came from a thread open in the app, else ''. A call the scan found
+    waiting has no host: the app's own session files decide then."""
+    if sys.platform != "win32" or ((item.get("host") or {}).get("kind") or "desktop") != "desktop":
         return ""
     return desktop_session_id(item.get("session_id") or "")
 
