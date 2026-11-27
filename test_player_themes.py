@@ -532,31 +532,25 @@ class ThemeTests(unittest.TestCase):
             self.pump()
             w._spot = lambda: None  # the real pointer stays out of it
             w._spot_draw((w.Wp - 3, 3))  # at a corner: the ring and the corner's curve light up
-            self.assertEqual(w.c.itemcget(w._spot_fill, "state"), "disabled")
             self.assertIsNotNone(w._corner_light())
             w._spot_draw((w.Wp // 2, -40))  # outside, over the top edge: its light still reaches the top strip
             self.assertEqual([w.c.itemcget(i, "state") for i in w._spot_rim][:1], ["disabled"])
-            # text under the light: the item keeps its place and clicks, coloured pieces stand in, all comes back
-            t = w.pan_name
-            w.c.itemconfigure(t, text="sample")
-            fill, (x0, y0, x1, y1) = w.c.itemcget(t, "fill"), w.c.bbox(t)
-            at = ((x0 + x1) // 2, (y0 + y1) // 2)
-            w._text_light(at, None)
-            order = lambda: w.c.find_all().index(t) > w.c.find_all().index(w.sheet)
-            self.assertFalse(order())
-            self.assertEqual(w.c.itemcget(t, "fill"), fill)
-            self.assertEqual(w.c.bbox(t), (x0, y0, x1, y1))
-            w.c.event_generate("<Motion>", x=at[0], y=at[1])  # disabled pieces pass the pointer on
-            self.assertIn("panname", w.c.gettags("current"))
-            shown = [(w.c.coords(i)[0], w.c.itemcget(i, "text")) for i in w.c.find_withtag("sheen")
-                     if w.c.itemcget(i, "state") == "disabled" and abs(w.c.coords(i)[1] - y0) < 2]
-            self.assertIn("sample", "".join(s for _, s in sorted(shown)))
-            w._text_light(None, None)
-            self.assertTrue(order())
-            self.assertFalse([i for i in w.c.find_withtag("sheen") if w.c.itemcget(i, "state") != "hidden"])
+            # while speaking the whole title catches fire: no per-letter copies, the item itself changes colour
+            t, n = w.pan_name, len(w.c.find_all())
+            base = w._fills.get(t, player.FG)
+            w._title_fire(0.6)
+            self.assertNotEqual(w.c.itemcget(t, "fill"), base)
+            self.assertEqual(len(w.c.find_all()), n)
+            w._title_fire(None)
+            self.assertEqual(w.c.itemcget(t, "fill"), base)
             w._spot_draw(None)
-            self.assertEqual(w.c.itemcget(w._spot_fill, "state"), "hidden")
             self.assertIsNone(w._corner_light())
+            w._slow = player.SPOT_SLOW_RUN  # frames stayed slow: the watchdog keeps the pointer light off
+            w.__dict__.pop("_spot", None)
+            w._spot()
+            self.assertIsNone(w._spot_at)
+            w.root.after_cancel(w._spot_job)
+            w._spot, w._slow = (lambda: None), 0
             # ignite: each letter catches after the one before, then all rest
             ig = player.FX["madefire"]["ig"]
             self.assertIsNone(player.ignite(0, 0.3, "#ffffff", ig))
@@ -580,6 +574,71 @@ class ThemeTests(unittest.TestCase):
             st.update(theme="ember", spotlight="madefire", reduce_motion=False)
             w._rebuild()
 
+    def test_settings_scroll_stays_fast(self):
+        """The Settings body scrolled to the bottom and back many times: each step and its repaint fit a frame
+        budget, in the light and the dark MadeFire theme, with the pointer light off and on."""
+        import statistics
+        w = self.w
+        for theme in ("madefire", "daylight"):
+            for spot in ("off", "all"):
+                with self.subTest(theme=theme, spotlight=spot):
+                    self.st.update(theme=theme, spotlight=spot)
+                    w._rebuild()
+                    w._set_mode("panel")
+                    w._toggle_settings()
+                    w._room = lambda: w.p(520)
+                    w._layout_key = None
+                    w._tick_once(force=True)
+                    self.pump(0.2)
+                    self.assertGreater(w._set_max, 0)
+                    steps, t_all = [], time.perf_counter()
+                    for n in range(60):
+                        t0 = time.perf_counter()
+                        w._set_scroll(w._set_off + (w.p(48) if (n // 15) % 2 == 0 else -w.p(48)))
+                        w.root.update()
+                        steps.append((time.perf_counter() - t0) * 1000)
+                    total = time.perf_counter() - t_all
+                    self.assertLess(statistics.median(steps), 40, steps)
+                    self.assertLess(max(steps), 400, steps)
+                    self.assertLess(total, 6.0)
+                    del w._room
+                    w._toggle_settings()
+        self.st.update(theme="ember", spotlight="all")
+        w._rebuild()
+
+    def test_long_setting_hint_wraps_without_overlap(self):
+        w = self.w
+        self.st.update(theme="madefire", spotlight="madefire", player_width=0.85)
+        w._rebuild()
+        w._set_mode("panel")
+        w._toggle_settings()
+        self.pump(0.2)
+        c = w.c
+
+        def box(text):
+            return next(c.bbox(i) for i in c.find_withtag("set") if c.type(i) == "text" and c.itemcget(i, "text") == text)
+        hint = box(next(c.itemcget(i, "text") for i in c.find_withtag("set")
+                        if c.type(i) == "text" and c.itemcget(i, "text").startswith("A light follows")))
+        self.assertLessEqual(hint[3], box("Reduce motion")[1])
+        w._toggle_settings()
+        self.st.update(theme="ember", spotlight="all", player_width=1.0)
+        w._rebuild()
+
+    def test_hang_watch_writes_the_stuck_stack(self):
+        w = self.w
+        before = set(voiced.data_dir().glob("hang-*.txt"))
+        old = player.HANG_S
+        player.HANG_S = 1.0
+        try:
+            w._hang_watch()
+            time.sleep(2.6)  # the UI thread is blocked: no heartbeat
+            new = set(voiced.data_dir().glob("hang-*.txt")) - before
+            self.assertEqual(len(new), 1)
+            text = next(iter(new)).read_text(encoding="utf-8")
+            self.assertIn("test_hang_watch_writes_the_stuck_stack", text)  # the stuck UI thread's own frame
+        finally:
+            player.HANG_S = old
+
     def test_paper_sheet(self):
         w, st = self.w, self.st
         try:
@@ -592,6 +651,16 @@ class ThemeTests(unittest.TestCase):
                 self.assertEqual(w._sheet_pil.size, (w.Wp, w._target_h))  # the linen covers the whole card
                 self.assertEqual(w.c.itemcget(w.sheet, "state"), "disabled")
             self.assertGreater(len(w._sheet_pil.crop((100, 100, 160, 160)).getcolors(4000)), 8)  # it has a texture
+            w._set_mode("panel")
+            self.pump()
+            w._spot = lambda: None
+            w._spot_draw((150, 10))  # only the edge on the pointer's half follows it: the other keeps its image
+            subs = list(w._foil_sub)
+            w._spot_draw((260, 12))
+            self.assertNotEqual(w._foil_sub[0], subs[0])
+            self.assertEqual(w._foil_sub[1:], subs[1:])
+            w._spot_draw(None)
+            w.__dict__.pop("_spot", None)
             row = w.art.foil(400, 120)  # the copper is brightest at the pointer
             lum = [sum(row.getpixel((x, 0))) for x in range(400)]
             self.assertLess(abs(lum.index(max(lum)) - 120), 6)

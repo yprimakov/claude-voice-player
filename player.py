@@ -25,8 +25,10 @@ import threading
 import time
 from pathlib import Path
 
-from voiced import (SKIPPED, active_sessions, answers_with_note, call_decisions, combined_answer, decisions_of,
-                    thread_title)
+from voiced import (SKIPPED, active_sessions, answers_with_note, call_decisions, combined_answer, data_dir,
+                    decisions_of, thread_title)
+
+HANG_S = 3.0  # the UI thread missed its heartbeat this long: write every thread's stack to the data folder
 
 
 def sent_label(call: dict) -> str:
@@ -106,27 +108,38 @@ THEME_NAMES = {"ember": "Ember", "graphite": "Graphite", "midnight": "Midnight",
 
 # The card as the v5 design system draws a panel: a two-stop fill, firelight from the corners (colour, peak, corner x, y,
 # reach as a share of the card's width and height), and a texture tile (assets/, 2x): linen multiplies, grain lies on top.
-SHEETS = {
-    "madefire": dict(top=(33, 26, 41), bottom=(19, 16, 25), tile="grain", px=240,
-                     lights=(((255, 107, 44), 0.12, 0, 1, 0.54, 0.42), ((255, 178, 91), 0.05, 1, 0, 0.455, 0.3575))),
-    "daylight": dict(top=(255, 251, 245), bottom=(249, 243, 234), tile="linen", px=200,
-                     lights=(((255, 107, 44), 0.06, 0, 1, 0.54, 0.42),)),
+# The card's paper: top-left colour to bottom-right colour, soft lights (rgb, peak, centre x, y, radius x, y as
+# parts of the card), then a tile. Two looks per theme; SHEET_LOOK picks one.
+SHEET_LOOKS = {
+    "madefire": {
+        "A": dict(top=(7, 6, 11), bottom=(17, 13, 24), diag=True, tile="grain", px=240,
+                  lights=(((255, 107, 44), 0.16, 0, 1, 0.62, 0.48), ((255, 178, 91), 0.04, 1, 0, 0.455, 0.3575))),
+        "B": dict(top=(7, 6, 11), bottom=(17, 13, 24), diag=True, tile=None, px=240,
+                  lights=(((255, 107, 44), 0.24, 0.1, 0.95, 0.75, 0.55), ((232, 71, 26), 0.08, 0, 1, 0.35, 0.3))),
+    },
+    "daylight": {
+        "A": dict(top=(251, 247, 241), bottom=(239, 230, 218), diag=True, tile="grain", px=240,
+                  lights=(((255, 107, 44), 0.08, 0, 1, 0.62, 0.48),)),
+        "B": dict(top=(251, 247, 241), bottom=(239, 230, 218), diag=True, tile=None, px=200,
+                  lights=(((255, 107, 44), 0.12, 0.1, 0.95, 0.75, 0.55), ((255, 178, 91), 0.06, 1, 0, 0.45, 0.35))),
+    },
 }
+SHEET_LOOK = "A"
+SHEETS = {name: looks[SHEET_LOOK] for name, looks in SHEET_LOOKS.items()}
 FOIL = ((0, (169, 80, 42)), (0.18, (201, 104, 58)), (0.32, (226, 154, 104)), (0.42, (240, 180, 136)), (0.5, (255, 230, 202)),
         (0.58, (240, 180, 136)), (0.68, (226, 154, 104)), (0.82, (201, 104, 58)), (1, (169, 80, 42)))
 RADIAL = 181                                   # Pillow's radial_gradient at the middle of an edge (255 is its corner)
 FOIL_PX, FOIL_EDGE = 600, 1.5                  # the copper band repeats; its bright point follows the pointer
-SPOT_REACH, SPOT_WASH, SPOT_RIM, SPOT_HI, SPOT_TEXT, SPOT_HEAT = 520, 330, 264, 165, 168, 150  # px radii (v5 spotlight)
+SPOT_REACH, SPOT_RIM, SPOT_HI = 520, 264, 165  # px radii (v5 spotlight)
+SPOT_SLOW_MS, SPOT_SLOW_RUN = 50, 3  # this many frames in a row over this: the pointer light turns itself off
 
 # Spotlight and shimmer. Themes in FX have their own light; the others use their accent when the setting says "all".
-# fill: wash on the card. rim, hi: the ring inside the edge, then white as an overlay. sheen: warm light on the text.
-# ig: the title's letters near the pointer (and in turn while speaking) flash the first colour, cool to the second.
+# rim, hi: the ring inside the edge, then white as an overlay. ig: while speaking the title flashes the first colour,
+# cools to the second. (No wash and no text sheen: each repainted most of the canvas, and per-letter text jittered.)
 FX = {
-    "madefire": dict(fill=((246, 144, 85), 0.05), rim=((247, 128, 59), 0.75), hi=0.32, sheen=((255, 199, 143), "overlay"),
-                     ig=("#FFE7C2", "#FFB25B"), art=0.4,
+    "madefire": dict(rim=((247, 128, 59), 0.75), hi=0.32, ig=("#FFE7C2", "#FFB25B"), art=0.4,
                      glows=(((255, 107, 44), 0.05), ((232, 71, 26), 0.04), ((194, 55, 15), 0.03), ((255, 178, 91), 0.02))),
-    "daylight": dict(fill=((255, 133, 51), 0.07), rim=((247, 128, 59), 0.6), hi=0.18, sheen=((203, 61, 11), "normal"),
-                     ig=("#E8471A", "#B8320C"), art=0.25, glows=()),
+    "daylight": dict(rim=((247, 128, 59), 0.6), hi=0.18, ig=("#E8471A", "#B8320C"), art=0.25, glows=()),
 }
 DRIFT = ((26, 0.22, 0.12, 0.28, 0.20), (38, 0.80, 0.30, -0.26, 0.24), (51, 0.35, 0.85, 0.30, -0.22),
          (44, 0.75, 0.80, -0.20, -0.26))  # per glow: period s, start x, start y, drift x, drift y (of the panel)
@@ -137,16 +150,8 @@ def fx_of(theme: str, setting: str):
     if setting == "off" or (setting != "all" and theme not in FX):
         return None
     a = ACC_RGB
-    return FX.get(theme) or dict(fill=(a, 0.05), rim=(a, 0.75), hi=0.32, sheen=(_rgb(EMBER), "normal"), ig=(EMBER, EMBER), art=0.3,
+    return FX.get(theme) or dict(rim=(a, 0.75), hi=0.32, ig=(EMBER, EMBER), art=0.3,
                                  glows=((a, 0.07), (a, 0.05), (a, 0.04), (a, 0.04)))
-
-
-def sheen_on(fill: str, light: tuple, mode: str) -> str:
-    """A text colour fully under the spotlight: CSS overlay of the light on it, or the light itself."""
-    if mode != "overlay":
-        return "#%02x%02x%02x" % light
-    return "#%02x%02x%02x" % tuple(round(2 * b * v / 255 if b < 128 else 255 - 2 * (255 - b) * (255 - v) / 255)
-                                   for b, v in zip(_rgb(fill), light))
 
 
 IGNITE = 6.0  # seconds a title's cycle takes: each letter catches 55 ms after the one before, cools, then all rest
@@ -548,15 +553,20 @@ class Art:
             for old in [k for k in self._cache if isinstance(k, tuple) and k[0] == "sheet"][:-5]:
                 del self._cache[old]
             I, sh = self.I, SHEETS[name]
+            ramp = I.linear_gradient("L")
+            if sh.get("diag"):  # top-left to bottom-right
+                ramp = I.blend(ramp, ramp.rotate(90), 0.5)
             im = I.composite(I.new("RGB", (w, h), sh["bottom"]), I.new("RGB", (w, h), sh["top"]),
-                             I.linear_gradient("L").resize((w, h), I.BICUBIC))
+                             ramp.resize((w, h), I.BICUBIC))
             for rgb, peak, cx, cy, rx, ry in sh["lights"]:
                 rx, ry = round(rx * w), round(ry * h)
                 g = I.radial_gradient("L").resize((2 * rx, 2 * ry), I.BICUBIC).point(
                     [round(255 * peak * max(0, 1 - v / RADIAL)) for v in range(256)])
-                x, y = cx * w, cy * h
+                x, y = round(cx * w), round(cy * h)
                 im.paste(rgb, (x - rx, y - ry), g)
             try:
+                if not sh.get("tile"):
+                    raise OSError("no tile")
                 t, full = self.tile(sh["tile"], sh["px"]), I.new("RGBA", (w, h))
                 for ty in range(0, h, t.height):
                     for tx in range(0, w, t.width):
@@ -1990,14 +2000,13 @@ class Widget:
 
     # ---------------------------------------------------------- spotlight and shimmer
     def _fx_build(self):
-        """Light over the card and its hit areas, under all content: drifting glows, the pointer's wash, the edge and its ring."""
-        c, n = self.c, dict(state="hidden", tags=("bg",))
-        self._fx_imgs, self._foil_key, self._foil_imgs = [], None, []
+        """Light over the card and its hit areas, under all content: drifting glows, the edge and its ring."""
+        c = self.c
+        self._fx_imgs, self._foil_imgs = [], []
         self._fx = fx_of(self.cfg.get("theme"), self.cfg.get("spotlight"))
         self._foil_on = self.cfg.get("theme") == "daylight"
-        self._spot_at, self._spot_key, self._spot_fill = None, None, None
+        self._spot_at, self._spot_key, self._fire, self._slow, self._foil_sub = None, None, None, 0, [None] * 4
         self._drift_items, self._spot_rim, self._orb_lit = [], [], None
-        self._lit, self._lit_key, self._texts_seen, self._layouts, self._ghosts = [], None, {}, {}, {}
         # a loop from before a rebuild keeps running and just finds the new items
         self._edge_items = [c.create_image(0, 0, anchor="nw", state="disabled", tags=("bg", "edge")) for _ in range(4)] \
             if self._foil_on else []
@@ -2006,7 +2015,6 @@ class Widget:
         for rgb, peak in self._fx["glows"]:
             self._drift_items.append(c.create_image(0, 0, image=self.art.disc(round(self.Wp * 0.42), rgb, peak),
                                                     state="disabled", tags=("bg",)))
-        self._spot_fill = c.create_image(0, 0, **n)
         self._spot_rim = [c.create_image(0, 0, anchor="nw", state="hidden", tags=("bg", "edge", "spotrim")) for _ in range(4)]
         self._orb_lit = c.create_image(0, 0, state="hidden")
         self._drift_place(time.time())
@@ -2032,27 +2040,40 @@ class Widget:
 
     def _spot_kick(self, e=None):
         if self._fx and not getattr(self, "_spot_job", None):
+            self._spot_due = time.perf_counter()
             self._spot_job = self.root.after(1, self._spot)
 
     def _spot(self):
-        """Follow the pointer, also outside the card (the light reaches in): 30 fps while it moves, slow otherwise."""
+        """Follow the pointer, also outside the card (the light reaches in): 30 fps while it moves, slow otherwise.
+        A frame costs its own work plus how late it ran (the repaint of the last frame and anything else on the
+        UI thread). It backs off when frames are slow and stops when they stay slow."""
         self._spot_job = None
         if not self._fx:
             return
         if not self._visible:
             self._spot_draw(None)
-            self._text_light(None, None)
+            self._title_fire(None)
             return  # _tick_once starts it again
+        t0 = time.perf_counter()
+        late = max(0.0, t0 - getattr(self, "_spot_due", t0)) * 1000
         x, y = self.root.winfo_pointerx() - self.root.winfo_rootx(), self.root.winfo_pointery() - self.root.winfo_rooty()
         d = max(-x, x - self.Wp, -y, y - self.h, 0)
-        at = (x, y) if d <= self.p(SPOT_REACH) else None
+        at = (x - x % 3, y - y % 3) if d <= self.p(SPOT_REACH) and self._slow < SPOT_SLOW_RUN else None  # 3 px steps
         wave = self._wave()
         moved = at != self._spot_at
         if moved or at:
             self._spot_draw(at)
-        if moved or at or wave is not None or self._lit_key:
-            self._text_light(at, wave)
-        self._spot_job = self.root.after(33 if moved or wave is not None else 100 if at else 150, self._spot)
+        self._title_fire(wave)
+        ms = (time.perf_counter() - t0) * 1000 + late  # no update_idletasks here: forcing a redraw in a timer can lock up
+        if moved and at:
+            self._slow = self._slow + 1 if ms > SPOT_SLOW_MS else 0
+            if self._slow == SPOT_SLOW_RUN:
+                self.api.log(f"spotlight off for this run: {SPOT_SLOW_RUN} frames over {SPOT_SLOW_MS} ms (last {ms:.0f} ms)")
+                self._spot_draw(None)
+        wait = 33 if moved or wave is not None else 100 if at else 150
+        wait = max(wait, int(ms * 3))
+        self._spot_due = time.perf_counter() + wait / 1000
+        self._spot_job = self.root.after(wait, self._spot)
 
     def _wave(self):
         """Time in the title's ignite cycle while speaking (None at rest or with motion off)."""
@@ -2074,14 +2095,11 @@ class Widget:
         self._spot_key = key
         self._edge_draw()
         if at is None:
-            c.itemconfigure(self._spot_fill, state="hidden")
             c.itemconfigure(self._orb_lit, state="hidden")
             c.itemconfigure("spotrim", state="hidden", image="")
             self._glass_shape()
             return
         x, y = at
-        c.itemconfigure(self._spot_fill, image=art.disc(self.p(SPOT_WASH), *fx["fill"], 1), state="disabled")
-        c.coords(self._spot_fill, x, y)
         e, reach, imgs = self._edge_px(), self.p(SPOT_RIM), []
         ie = math.ceil(e)
         for item, (x0, y0, x1, y1) in zip(self._spot_rim, ((r, ie, w - r, ie + 1), (r, h - ie - 1, w - r, h - ie),
@@ -2108,37 +2126,44 @@ class Widget:
             return self._sheet_pil.crop(box)
         return self.art.I.new("RGB", (box[2] - box[0], box[3] - box[1]), _rgb(band or CARD))
 
-    def _foil_x(self):
-        return self._spot_at[0] if self._spot_at and self._fx else -9999 * self.S  # the document's resting place
+    def _foil_xs(self):
+        """Where the copper glints on the top and on the bottom edge: at the pointer on the half it is in, else at
+        rest. Tk repaints the box around everything that changed, so two edges at once repainted the whole card."""
+        rest, at = -9999 * self.S, self._spot_at if self._fx else None
+        if not at:
+            return rest, rest
+        return (at[0], rest) if at[1] < self.h / 2 else (rest, at[0])
 
     def _edge_draw(self):
-        """The copper foil edge: 1.5 px, bright where the pointer is."""
+        """The copper foil edge: 1.5 px, bright where the pointer is. Only an edge that changed is redrawn."""
         if not self._edge_items:
             return
         c, art, w, h, r, e = self.c, self.art, self.Wp, self.h, self._radius or 0, self._edge_px()
-        key = (round(self._foil_x()), w, h, r)
-        if key == getattr(self, "_foil_key", None) and self._foil_imgs:
-            return
-        self._foil_key = key
-        n, row = math.ceil(e), art.foil(w, self._foil_x())
-        imgs = []
-        for horizontal, flip, xy in ((True, False, (r, 0)), (True, True, (r, h - n)),
-                                     (False, False, (0, r)), (False, True, (w - n, r))):
+        tx, bx = self._foil_xs()
+        rest, n = -9999 * self.S, math.ceil(e)
+        if len(self._foil_imgs) != 4:
+            self._foil_imgs, self._foil_sub = [""] * 4, [None] * 4
+        for i, (horizontal, flip, xy, fx_) in enumerate(((True, False, (r, 0), tx), (True, True, (r, h - n), bx),
+                                                         (False, False, (0, r), rest), (False, True, (w - n, r), rest))):
+            key = (round(fx_), w, h, r, n)
+            if key == self._foil_sub[i]:
+                continue
+            self._foil_sub[i] = key
             size = (w - 2 * r, n) if horizontal else (n, h - 2 * r)
             if min(size) < 1:
-                imgs.append("")
+                self._foil_imgs[i] = ""
+                c.itemconfigure(self._edge_items[i], image="")
                 continue
+            row = art.foil(w, fx_)
             im = (row.crop((r, 0, w - r, 1)) if horizontal else row.crop((xy[0], 0, xy[0] + n, 1))).resize(size, art.I.NEAREST)
             cover = art.I.new("L", (1, n) if horizontal else (n, 1), 255)
             if n > e:  # the last pixel is part covered
                 at = 0 if flip else n - 1
                 cover.putpixel((0, at) if horizontal else (at, 0), round(255 * (1 - n + e)))
             im.putalpha(cover.resize(size, art.I.NEAREST))
-            imgs.append(art.TK.PhotoImage(im))
-            c.coords(self._edge_items[len(imgs) - 1], *xy)
-        for item, img in zip(self._edge_items, imgs):
-            c.itemconfigure(item, image=img)
-        self._foil_imgs = imgs
+            self._foil_imgs[i] = art.TK.PhotoImage(im)
+            c.coords(self._edge_items[i], *xy)
+            c.itemconfigure(self._edge_items[i], image=self._foil_imgs[i])
 
     def _corner_light(self, band=None, bd=None):
         """(key, foil, ring, edge px) for the four corners as quadrants of a 2r square, or None: a plain edge."""
@@ -2151,9 +2176,10 @@ class Widget:
         spots = list(zip(((0, 0), (w - r, 0), (0, h - r), (w - r, h - r)), ((0, 0), (r, 0), (0, r), (r, r))))
         foil = ring = None
         if self._foil_on:
-            foil, row = art.I.new("RGB", (2 * r, 2 * r)), art.foil(w, self._foil_x())
-            for (cx, _), q in spots:
-                foil.paste(row.crop((cx, 0, cx + r, 1)).resize((r, r), art.I.NEAREST), q)
+            tx, bx = self._foil_xs()
+            foil, rows = art.I.new("RGB", (2 * r, 2 * r)), (art.foil(w, tx), art.foil(w, bx))
+            for (cx, cy), q in spots:
+                foil.paste(rows[cy > 0].crop((cx, 0, cx + r, 1)).resize((r, r), art.I.NEAREST), q)
         near = [] if not at else [((cx, cy), q) for (cx, cy), q in spots if max(cx - at[0], 0, at[0] - cx - r) ** 2
                                   + max(cy - at[1], 0, at[1] - cy - r) ** 2 < reach ** 2]
         if near:
@@ -2163,7 +2189,8 @@ class Widget:
                 ring.paste(art.ring(base.crop((*q, q[0] + r, q[1] + r)), at[0] - cx, at[1] - cy, self._fx), q)
         if not foil and not ring:
             return None
-        return ((round(self._foil_x()) if foil else None, at if near else None, w, h), foil, ring, self._edge_px())
+        return ((tuple(map(round, self._foil_xs())) if foil else None, at if near else None, w, h), foil, ring,
+                self._edge_px())
 
     def _orb_light(self, x: int, y: int):
         """The spotlight's warm blend on the orb."""
@@ -2186,119 +2213,19 @@ class Widget:
         c.itemconfigure(self._orb_lit, image=self._orb_img, state="disabled")
         c.tag_raise(self._orb_lit, self.orb)
 
-    def _pieces(self, item, letters: bool):
-        """Where a text item's pieces (3 letters, or 1) are drawn: [(text, x, y, centre x, centre y)], None if unknown."""
+    def _title_fire(self, wave):
+        """While speaking, the title catches fire and cools (the whole word: per-letter pieces jittered and lagged)."""
         c = self.c
-        text, width = c.itemcget(item, "text"), int(float(c.itemcget(item, "width") or 0))
-        fname, anchor, xy = c.itemcget(item, "font"), c.itemcget(item, "anchor"), tuple(c.coords(item))
-        key = (text, width, fname, anchor, xy, letters)
-        old = self._layouts.get(item)
-        if old and old[0] == key:
-            return old[1], old[2]
-        font = next((f for f in self.F.values() if str(f) == fname), None)
-        out = None
-        if font and text and len(xy) == 2:
-            lines = []
-            for para in text.split("\n"):
-                if not width or font.measure(para) <= width:
-                    lines.append(para)
-                    continue
-                cur = ""
-                for word in para.split(" "):  # as Tk wraps: at spaces
-                    if cur and font.measure(cur + " " + word) > width:
-                        lines.append(cur)
-                        cur = word
-                    else:
-                        cur = cur + " " + word if cur else word
-                lines.append(cur)
-            lh, bb = font.metrics("linespace"), c.bbox(item)
-            if bb and abs((bb[3] - bb[1]) - lh * len(lines)) <= 2:  # else Tk wrapped it another way: leave it
-                tw = max(font.measure(q) for q in lines)
-                left = xy[0] - (tw if anchor.endswith("e") else 0 if "w" in anchor else tw / 2)
-                out, n = [], 1 if letters else 3
-                for j, q in enumerate(lines):
-                    for i in range(0, len(q), n):
-                        bit = q[i:i + n]
-                        px, pw = left + font.measure(q[:i]), font.measure(bit)
-                        out.append((bit, px, bb[1] + j * lh, px + pw / 2, bb[1] + (j + 0.5) * lh, i))
-        self._layouts[item] = (key, out, font)
-        return out, font
-
-    def _text_light(self, at, wave):
-        """Warm sheen on the text near the pointer, and the title's letters on fire. A lit item waits just
-        under the opaque sheet (its clicks and size stay) while coloured pieces stand in: over it they look bold."""
-        c, fx, p = self.c, self._fx, self.p
-        if not (fx and self._sheet_name and self._sheet_key):
-            at = wave = None  # no sheet to hide the text behind
-        want = []
         title = self.cap_name if self.mode == "cap" else self.pan_name
-        R, H = p(SPOT_TEXT), p(SPOT_HEAT)
-        found = set(c.find_overlapping(at[0] - R, at[1] - R, at[0] + R, at[1] + R)) if at else set()
-        if wave is not None:
-            found.add(title)
-        ghosts = set()
-        for item in sorted(found):
-            if item not in self._texts_seen:
-                self._texts_seen[item] = c.type(item) == "text" and "sheen" not in c.gettags(item)
-            if not self._texts_seen[item] or c.itemcget(item, "state") == "hidden":
-                continue
-            fill = c.itemcget(item, "fill")
-            if len(fill) != 7 or (fill in (ACC_INK, ORB_INK) and fill != FG):  # text on a filled button keeps its ink
-                continue
-            runs, lit = [], False
-            got, font = self._pieces(item, item == title)
-            for bit, x, y, cx, cy, i in got or ():
-                d = math.hypot(cx - at[0], cy - at[1]) if at else 1e9
-                col = None
-                if item == title:
-                    heat = round((1 - d / H) ** 1.4, 1) if d < H else 0
-                    col = ignite(i, wave, fill, fx["ig"]) if wave is not None else None
-                    if heat:
-                        col = mix(col or fill, mix(fx["ig"][1], fx["ig"][0], max(heat - 0.5, 0) * 2), min(heat * 2, 1))
-                elif d < R:
-                    k = round(0.55 * (1 - d / R), 2)
-                    if k >= 0.04:
-                        col = mix(fill, sheen_on(fill, *fx["sheen"]), k)
-                lit = lit or bool(col and col != fill)
-                col = col or fill
-                if runs and runs[-1][3] == col and runs[-1][2] == y:
-                    runs[-1][0] += bit
-                else:
-                    runs.append([bit, x, y, col])
-            if lit:
-                ghosts.add(item)
-                want += [(item, bit, round(x), round(y), str(font), col) for bit, x, y, col in runs if bit.strip()]
-        for item, mark in list(self._ghosts.items()):
-            if item not in ghosts:  # back to its place in the stack
-                if c.type(item):
-                    c.tag_raise(item, mark)
-                c.delete(mark)
-                del self._ghosts[item]
-        for item in ghosts - set(self._ghosts):
-            mark = self._ghosts[item] = c.create_line(-9, -9, -9, -9, state="hidden")  # keeps its place
-            c.tag_raise(mark, item)
-            c.tag_lower(item, self.sheet)
-        key = tuple(want) or None
-        if key == self._lit_key:
+        base = self._fills.get(title, FG)
+        col = ignite(0, wave, base, self._fx["ig"]) if wave is not None and self._fx else None
+        want = (title, col)
+        if want == self._fire:
             return
-        self._lit_key = key
-        while len(self._lit) < len(want):
-            self._lit.append([c.create_text(0, 0, anchor="nw", state="hidden", tags=("sheen",)), None])
-        for slot, w_ in zip(self._lit, want):
-            it, old = slot
-            if old != w_:
-                item, bit, x, y, font, col = w_
-                if old and old[:5] == w_[:5]:
-                    c.itemconfigure(it, fill=col)
-                else:
-                    c.coords(it, x, y)
-                    c.itemconfigure(it, text=bit, font=font, fill=col, state="disabled")
-                    c.tag_raise(it, self._ghosts[item])
-                slot[1] = w_
-        for slot in self._lit[len(want):]:
-            if slot[1]:
-                c.itemconfigure(slot[0], state="hidden")
-                slot[1] = None
+        old, self._fire = self._fire, want
+        if old and old[0] != title and old[1]:
+            c.itemconfigure(old[0], fill=self._fills.get(old[0], FG))
+        c.itemconfigure(title, fill=col or base)
 
     def _set_alpha(self, a: float):
         self.root.attributes("-alpha", a)
@@ -3864,7 +3791,6 @@ class Widget:
                 c.coords(self.send_bg, Wp - p(PAD) - p(5) - p(16), y + p(21))
                 c.coords(self.send_g, Wp - p(PAD) - p(5) - p(16), y + p(21))
                 y += p(42) + p(4)
-            self._text_light(None, None)  # every text back in its place first
             c.tag_raise("ask")
         c.itemconfigure("ask", state=state(bool(call)))
         if call:
@@ -4167,9 +4093,10 @@ class Widget:
                 x += w + p(8)
             y += ch + p(8)
             if hints.get(cur):
-                c.create_text(x0, y, anchor="nw", text=hints[cur], font=self.F["meta"], fill=FAINT, width=x1 - x0,
-                              tags=("set",))
-                y += p(18)
+                t = c.create_text(x0, y, anchor="nw", text=hints[cur], font=self.F["meta"], fill=FAINT, width=x1 - x0,
+                                  tags=("set",))
+                bb = c.bbox(t)  # a long hint wraps: the next row starts below its last line
+                y += max(p(18), (bb[3] - bb[1]) if bb else 0)
             return y + p(6)
 
         # appearance
@@ -4187,8 +4114,8 @@ class Widget:
         y = toggle("pulse_with_voice", "Pulse with the voice", "Off: a slow, steady breath while speaking", y)
         y = choice("spotlight", "Spotlight & shimmer",
                    [("madefire", "MadeFire themes"), ("all", "All themes"), ("off", "Off")],
-                   {"madefire": "A light follows the pointer over edges and text; titles catch fire",
-                    "all": "The same light and shimmer in every theme, in its own colour; text glows in the MadeFire themes",
+                   {"madefire": "A light follows the pointer along the edges; titles catch fire while speaking",
+                    "all": "Every theme, each in its own colour",
                     "off": "No pointer light and no shimmer"}, y)
         y = toggle("reduce_motion", "Reduce motion", "Panels change at once; fades stay", y)
         y += p(14)
@@ -4252,7 +4179,6 @@ class Widget:
             c.tag_bind(tag, "<Leave>", lambda e, t=t: (self._tint(t, EMBER), c.configure(cursor="")))
         y = self._made_by(fy + p(22))
         y += p(R_PANEL)
-        self._text_light(None, None)  # every text back in its place first
         c.tag_raise("set")
         c.tag_lower("sethit", self.glow_cap)  # hit areas stay under the ambient light
         y = self._set_scroll_setup(y)
@@ -4666,4 +4592,40 @@ class Widget:
         self._layout_key = None
 
     def run(self):
+        self._hang_watch()
         self.root.mainloop()
+
+    def _hang_watch(self):
+        """A frozen player can't report itself, so a side thread watches a heartbeat the UI thread sets twice a
+        second. When it stops for HANG_S, every thread's stack goes to hang-<time>.txt (once per freeze)."""
+        import faulthandler
+        self._beat_at = time.monotonic()
+
+        def beat():
+            self._beat_at = time.monotonic()
+            try:
+                self.root.after(500, beat)
+            except self.tk.TclError:
+                pass  # closing
+
+        def watch():
+            stuck = False
+            while not self.vq._stop:
+                time.sleep(1)
+                late = time.monotonic() - self._beat_at
+                if late < HANG_S:
+                    if stuck:
+                        self.api.log(f"player responsive again after the freeze")
+                    stuck = False
+                elif not stuck:
+                    stuck = True
+                    path = data_dir() / time.strftime("hang-%Y%m%d-%H%M%S.txt")
+                    try:
+                        with open(path, "w", encoding="utf-8") as f:
+                            f.write(f"player UI thread stuck {late:.1f}s; view={self.view} mode={self.mode}\n")
+                            faulthandler.dump_traceback(f, all_threads=True)
+                    except OSError:
+                        pass
+                    self.api.log(f"player froze ({late:.0f}s): stacks in {path.name}")
+        beat()
+        threading.Thread(target=watch, daemon=True, name="hang-watch").start()
