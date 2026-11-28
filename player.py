@@ -132,6 +132,7 @@ RADIAL = 181                                   # Pillow's radial_gradient at the
 FOIL_PX, FOIL_EDGE = 600, 1.5                  # the copper band repeats; its bright point follows the pointer
 SPOT_REACH, SPOT_RIM, SPOT_HI = 520, 264, 165  # px radii (v5 spotlight)
 SPOT_SLOW_MS, SPOT_SLOW_RUN = 50, 3  # this many frames in a row over this: the pointer light turns itself off
+SPOT_REARM_S = 10  # ...and comes back after this long, so one busy moment does not turn it off for good
 
 # Spotlight and shimmer. Themes in FX have their own light; the others use their accent when the setting says "all".
 # rim, hi: the ring inside the edge, then white as an overlay. ig: while speaking the title flashes the first colour,
@@ -2055,6 +2056,8 @@ class Widget:
             self._title_fire(None)
             return  # _tick_once starts it again
         t0 = time.perf_counter()
+        if self._slow >= SPOT_SLOW_RUN and t0 - getattr(self, "_slow_at", t0) > SPOT_REARM_S:
+            self._slow = 0
         late = max(0.0, t0 - getattr(self, "_spot_due", t0)) * 1000
         x, y = self.root.winfo_pointerx() - self.root.winfo_rootx(), self.root.winfo_pointery() - self.root.winfo_rooty()
         d = max(-x, x - self.Wp, -y, y - self.h, 0)
@@ -2068,7 +2071,8 @@ class Widget:
         if moved and at:
             self._slow = self._slow + 1 if ms > SPOT_SLOW_MS else 0
             if self._slow == SPOT_SLOW_RUN:
-                self.api.log(f"spotlight off for this run: {SPOT_SLOW_RUN} frames over {SPOT_SLOW_MS} ms (last {ms:.0f} ms)")
+                self._slow_at = t0
+                self.api.log(f"spotlight paused {SPOT_REARM_S}s: {SPOT_SLOW_RUN} frames over {SPOT_SLOW_MS} ms (last {ms:.0f} ms)")
                 self._spot_draw(None)
         wait = 33 if moved or wave is not None else 100 if at else 150
         wait = max(wait, int(ms * 3))
@@ -4221,7 +4225,7 @@ class Widget:
         # scroll left the pointer on an edge pixel, Tk's re-pick flipped Enter/Leave forever and froze the UI.
         # The underline is a separate line shown as "disabled": Tk never picks a disabled item, so it cannot
         # steal the pointer from the link (a pickable underline made the same loop).
-        bb = c.bbox(t)
+        bb = c.bbox(t) or (0, 0, 0, 0)
         u = c.create_line(bb[0] + 1, bb[3] - 1, bb[2] - 1, bb[3] - 1, fill=EMBER, width=max(1, p(1)),
                           state="hidden", tags=("set",))
         c.tag_bind("madeby", "<Enter>", lambda e: (c.itemconfigure(u, state="disabled"), c.configure(cursor="hand2")))
@@ -4613,9 +4617,11 @@ class Widget:
             except self.tk.TclError:
                 pass  # closing
 
+        self._hang_stop = stop = threading.Event()
+
         def watch():
             stuck = False
-            while not self.vq._stop:
+            while not self.vq._stop and not stop.is_set():
                 time.sleep(1)
                 late = time.monotonic() - self._beat_at
                 if late < HANG_S:
@@ -4628,7 +4634,10 @@ class Widget:
                     try:
                         with open(path, "w", encoding="utf-8") as f:
                             f.write(f"player UI thread stuck {late:.1f}s; view={self.view} mode={self.mode}\n")
+                            f.flush()  # faulthandler writes to the fd directly
                             faulthandler.dump_traceback(f, all_threads=True)
+                        for old in sorted(data_dir().glob("hang-*.txt"))[:-20]:  # keep the newest 20
+                            old.unlink(missing_ok=True)
                     except OSError:
                         pass
                     self.api.log(f"player froze ({late:.0f}s): stacks in {path.name}")

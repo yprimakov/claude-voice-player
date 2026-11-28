@@ -587,6 +587,7 @@ class ThemeTests(unittest.TestCase):
                     w._set_mode("panel")
                     w._toggle_settings()
                     w._room = lambda: w.p(520)
+                    self.addCleanup(lambda: w.__dict__.pop("_room", None))
                     w._layout_key = None
                     w._tick_once(force=True)
                     self.pump(0.2)
@@ -603,7 +604,7 @@ class ThemeTests(unittest.TestCase):
                     self.assertLess(total, 6.0)
                     del w._room
                     w._toggle_settings()
-        self.st.update(theme="ember", spotlight="all")
+        self.st.update(theme="ember", spotlight="madefire")
         w._rebuild()
 
     def test_long_setting_hint_wraps_without_overlap(self):
@@ -653,6 +654,37 @@ class ThemeTests(unittest.TestCase):
         self.assertEqual(c.bbox(link), bb)
         w._toggle_settings()
 
+    def test_both_paper_looks_draw(self):
+        """Look B is parked (SHEET_LOOK picks A) but must still draw, for both MadeFire themes."""
+        for name in ("madefire", "daylight"):
+            for look, sh in player.SHEET_LOOKS[name].items():
+                with self.subTest(theme=name, look=look):
+                    old = player.SHEETS[name]
+                    player.SHEETS[name] = sh
+                    try:
+                        im = player.Art(1.0).sheet(name, 320, 480)
+                    finally:
+                        player.SHEETS[name] = old
+                    self.assertIsNotNone(im)
+
+    def test_spot_frame_under_budget(self):
+        """One pointer-light frame (the main-thread work for a pointer move) fits the 8 ms target."""
+        import statistics
+        w = self.w
+        self.st.update(theme="madefire", spotlight="madefire")
+        w._rebuild()
+        w._set_mode("panel")
+        self.pump(0.2)
+        self.assertTrue(w._fx)
+        times = []
+        for n in range(60):
+            at = (6 * n % w.Wp - 6 * n % 3, (17 * n) % w.h - (17 * n) % w.h % 3)
+            t0 = time.perf_counter()
+            w._spot_draw(at)
+            times.append((time.perf_counter() - t0) * 1000)
+        w._spot_draw(None)
+        self.assertLess(statistics.median(times), 8, times)
+
     def test_hang_watch_writes_the_stuck_stack(self):
         w = self.w
         before = set(voiced.data_dir().glob("hang-*.txt"))
@@ -660,12 +692,17 @@ class ThemeTests(unittest.TestCase):
         player.HANG_S = 1.0
         try:
             w._hang_watch()
-            time.sleep(2.6)  # the UI thread is blocked: no heartbeat
-            new = set(voiced.data_dir().glob("hang-*.txt")) - before
+            new, t0 = set(), time.monotonic()
+            while not new and time.monotonic() - t0 < 8:  # the UI thread stays blocked: no heartbeat
+                time.sleep(0.2)
+                new = set(voiced.data_dir().glob("hang-*.txt")) - before
+            time.sleep(0.3)  # let the dump finish
             self.assertEqual(len(new), 1)
             text = next(iter(new)).read_text(encoding="utf-8")
+            self.assertTrue(text.startswith("player UI thread stuck"), text[:80])  # header before the stacks
             self.assertIn("test_hang_watch_writes_the_stuck_stack", text)  # the stuck UI thread's own frame
         finally:
+            w._hang_stop.set()
             player.HANG_S = old
 
     def test_paper_sheet(self):
