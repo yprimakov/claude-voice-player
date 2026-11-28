@@ -579,6 +579,14 @@ class ThemeTests(unittest.TestCase):
         budget, in the light and the dark MadeFire theme, with the pointer light off and on."""
         import statistics
         w = self.w
+
+        def restore():
+            w.__dict__.pop("_room", None)
+            if w.view == "settings":
+                w._toggle_settings()
+            self.st.update(theme="ember", spotlight="madefire")
+            w._rebuild()
+        self.addCleanup(restore)
         for theme in ("madefire", "daylight"):
             for spot in ("off", "all"):
                 with self.subTest(theme=theme, spotlight=spot):
@@ -587,7 +595,6 @@ class ThemeTests(unittest.TestCase):
                     w._set_mode("panel")
                     w._toggle_settings()
                     w._room = lambda: w.p(520)
-                    self.addCleanup(lambda: w.__dict__.pop("_room", None))
                     w._layout_key = None
                     w._tick_once(force=True)
                     self.pump(0.2)
@@ -604,8 +611,6 @@ class ThemeTests(unittest.TestCase):
                     self.assertLess(total, 6.0)
                     del w._room
                     w._toggle_settings()
-        self.st.update(theme="ember", spotlight="madefire")
-        w._rebuild()
 
     def test_long_setting_hint_wraps_without_overlap(self):
         w = self.w
@@ -676,14 +681,15 @@ class ThemeTests(unittest.TestCase):
         w._set_mode("panel")
         self.pump(0.2)
         self.assertTrue(w._fx)
+        self.addCleanup(w._spot_draw, None)
         times = []
         for n in range(60):
-            at = (6 * n % w.Wp - 6 * n % 3, (17 * n) % w.h - (17 * n) % w.h % 3)
+            x, y = 6 * n % w.Wp, 17 * n % w.h  # a sweep across the card
+            at = (x - x % 3, y - y % 3)  # the 3 px steps _spot uses
             t0 = time.perf_counter()
             w._spot_draw(at)
             times.append((time.perf_counter() - t0) * 1000)
-        w._spot_draw(None)
-        self.assertLess(statistics.median(times), 8, times)
+        self.assertLess(statistics.median(times), 8, times)  # measured about 2 ms
 
     def test_hang_watch_writes_the_stuck_stack(self):
         w = self.w

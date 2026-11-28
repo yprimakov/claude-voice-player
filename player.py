@@ -2072,7 +2072,9 @@ class Widget:
             self._slow = self._slow + 1 if ms > SPOT_SLOW_MS else 0
             if self._slow == SPOT_SLOW_RUN:
                 self._slow_at = t0
-                self.api.log(f"spotlight paused {SPOT_REARM_S}s: {SPOT_SLOW_RUN} frames over {SPOT_SLOW_MS} ms (last {ms:.0f} ms)")
+                if not getattr(self, "_slow_logged", False):
+                    self._slow_logged = True
+                    self.api.log(f"spotlight paused {SPOT_REARM_S}s: {SPOT_SLOW_RUN} frames over {SPOT_SLOW_MS} ms (last {ms:.0f} ms)")
                 self._spot_draw(None)
         wait = 33 if moved or wave is not None else 100 if at else 150
         wait = max(wait, int(ms * 3))
@@ -4225,11 +4227,12 @@ class Widget:
         # scroll left the pointer on an edge pixel, Tk's re-pick flipped Enter/Leave forever and froze the UI.
         # The underline is a separate line shown as "disabled": Tk never picks a disabled item, so it cannot
         # steal the pointer from the link (a pickable underline made the same loop).
-        bb = c.bbox(t) or (0, 0, 0, 0)
-        u = c.create_line(bb[0] + 1, bb[3] - 1, bb[2] - 1, bb[3] - 1, fill=EMBER, width=max(1, p(1)),
-                          state="hidden", tags=("set",))
-        c.tag_bind("madeby", "<Enter>", lambda e: (c.itemconfigure(u, state="disabled"), c.configure(cursor="hand2")))
-        c.tag_bind("madeby", "<Leave>", lambda e: (c.itemconfigure(u, state="hidden"), c.configure(cursor="")))
+        bb = c.bbox(t)
+        u = bb and c.create_line(bb[0] + 1, bb[3] - 1, bb[2] - 1, bb[3] - 1, fill=EMBER, width=max(1, p(1)),
+                                 state="hidden", tags=("set",))
+        line = lambda state: u and c.itemconfigure(u, state=state)
+        c.tag_bind("madeby", "<Enter>", lambda e: (line("disabled"), c.configure(cursor="hand2")))
+        c.tag_bind("madeby", "<Leave>", lambda e: (line("hidden"), c.configure(cursor="")))
         self._tipify("madeby", lambda: "Open madefire.ai in your browser")
         return y + self.F["link"].metrics("linespace") + p(16)
 
@@ -4621,8 +4624,9 @@ class Widget:
 
         def watch():
             stuck = False
-            while not self.vq._stop and not stop.is_set():
-                time.sleep(1)
+            while not self.vq._stop:
+                if stop.wait(1):
+                    break
                 late = time.monotonic() - self._beat_at
                 if late < HANG_S:
                     if stuck:
@@ -4636,10 +4640,13 @@ class Widget:
                             f.write(f"player UI thread stuck {late:.1f}s; view={self.view} mode={self.mode}\n")
                             f.flush()  # faulthandler writes to the fd directly
                             faulthandler.dump_traceback(f, all_threads=True)
-                        for old in sorted(data_dir().glob("hang-*.txt"))[:-20]:  # keep the newest 20
-                            old.unlink(missing_ok=True)
                     except OSError:
                         pass
+                    for old in sorted(data_dir().glob("hang-*.txt"))[:-20]:  # keep the newest 20
+                        try:
+                            old.unlink(missing_ok=True)
+                        except OSError:
+                            pass
                     self.api.log(f"player froze ({late:.0f}s): stacks in {path.name}")
         beat()
         threading.Thread(target=watch, daemon=True, name="hang-watch").start()
