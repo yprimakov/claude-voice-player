@@ -4217,10 +4217,15 @@ class Widget:
         t = c.create_text(mid, y, anchor="n", text="madefire.ai ↗", font=self.F["link"], fill=EMBER,
                           tags=("set", "madeby"))
         c.tag_bind("madeby", "<Button-1>", lambda e: self._open_url(self.MADEFIRE_URL))
-        self._link_u = self.F["link"].copy()
-        self._link_u.configure(underline=1)
-        c.tag_bind("madeby", "<Enter>", lambda e: (c.itemconfigure(t, font=self._link_u), c.configure(cursor="hand2")))
-        c.tag_bind("madeby", "<Leave>", lambda e: (c.itemconfigure(t, font=self.F["link"]), c.configure(cursor="")))
+        # Hover must never change what is under the pointer. A font swap moved the link's hit area, so after a
+        # scroll left the pointer on an edge pixel, Tk's re-pick flipped Enter/Leave forever and froze the UI.
+        # The underline is a separate line shown as "disabled": Tk never picks a disabled item, so it cannot
+        # steal the pointer from the link (a pickable underline made the same loop).
+        bb = c.bbox(t)
+        u = c.create_line(bb[0] + 1, bb[3] - 1, bb[2] - 1, bb[3] - 1, fill=EMBER, width=max(1, p(1)),
+                          state="hidden", tags=("set",))
+        c.tag_bind("madeby", "<Enter>", lambda e: (c.itemconfigure(u, state="disabled"), c.configure(cursor="hand2")))
+        c.tag_bind("madeby", "<Leave>", lambda e: (c.itemconfigure(u, state="hidden"), c.configure(cursor="")))
         self._tipify("madeby", lambda: "Open madefire.ai in your browser")
         return y + self.F["link"].metrics("linespace") + p(16)
 

@@ -624,6 +624,35 @@ class ThemeTests(unittest.TestCase):
         self.st.update(theme="ember", spotlight="all", player_width=1.0)
         w._rebuild()
 
+    def test_hover_never_changes_the_hovered_item(self):
+        """A hover handler that changes the item's font or coords moves its hit area, and Tk's re-pick
+        can then flip Enter/Leave forever (the Settings freeze of 2026-11-27). Enter/Leave keep shape."""
+        w = self.w
+        w._set_mode("panel")
+        w._toggle_settings()
+        self.pump(0.2)
+        c = w.c
+        items = [i for i in c.find_withtag("set") if c.type(i) == "text"]
+        before = {i: (c.itemcget(i, "font"), c.itemcget(i, "text"), c.coords(i)) for i in items}
+        link = next(i for i in c.find_withtag("madeby") if c.type(i) == "text")
+        bb = c.bbox(link)
+        n = [0]
+        def enter(e):
+            n[0] += 1
+            if n[0] > 50:  # a loop: break it so the test fails instead of hanging
+                c.tag_unbind("madeby", "<Enter>")
+                c.tag_unbind("madeby", "<Leave>")
+        c.tag_bind("madeby", "<Enter>", enter, add="+")
+        for y in range(bb[1], bb[3] + 1):  # every row, the underline row included
+            c.event_generate("<Motion>", x=(bb[0] + bb[2]) // 2, y=y)
+            c.itemconfigure(link, fill=c.itemcget(link, "fill"))  # forces a re-pick, like a scroll does
+            self.pump(0.02)
+        self.assertLess(n[0], 10, "Enter/Leave loop on the madefire.ai link")
+        after = {i: (c.itemcget(i, "font"), c.itemcget(i, "text"), c.coords(i)) for i in items}
+        self.assertEqual(before[link], after[link])
+        self.assertEqual(c.bbox(link), bb)
+        w._toggle_settings()
+
     def test_hang_watch_writes_the_stuck_stack(self):
         w = self.w
         before = set(voiced.data_dir().glob("hang-*.txt"))
