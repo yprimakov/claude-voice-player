@@ -1,0 +1,25 @@
+name: tests
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  unittest:
+    # The player and the call features are Windows-only (os.startfile, the Claude app's
+    # session files, window focus), so the suite runs on Windows, like on the PC.
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # test_voiced is stdlib only. test_player_themes opens the real Tk player and uses
+      # Pillow for the gradients; no model, audio device or onnxruntime is needed.
+      - run: python -m pip install Pillow
+      - run: python -m unittest -v test_voiced test_player_themes
